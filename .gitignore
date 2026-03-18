@@ -1,0 +1,14 @@
+.idea
+.serena/
+env-local
+
+# Local env files
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+
+# OS files
+.DS_Store
