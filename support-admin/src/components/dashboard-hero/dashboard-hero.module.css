@@ -1,0 +1,31 @@
+.heroSection {
+  background: linear-gradient(135deg, rgba(42, 171, 238, 0.95), rgba(26, 140, 206, 0.92));
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.statsGrid {
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .statsGrid {
+    min-width: 20rem;
+    width: auto;
+  }
+}
+
+.statCard {
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.themeToggle {
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(10px);
+}
+
+.themeToggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+}

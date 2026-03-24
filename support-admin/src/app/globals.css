@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+  --background: #dfe8f0;
+  --foreground: #14212b;
+  --panel: #eff4f8;
+  --card: #ffffff;
+  --card-alt: #e6f3ff;
+  --message-card: linear-gradient(180deg, var(--card-alt) 0%, rgba(255,255,255,0.98) 42%);
+  --message-meta: rgba(255,255,255,0.7);
+  --shell: linear-gradient(180deg, rgba(239,244,248,0.98), rgba(230,239,247,0.96));
+  --shell-strong: rgba(230,243,255,0.55);
+  --line: rgba(56, 86, 110, 0.18);
+  --muted: #587184;
+  --accent: #2aabee;
+  --accent-deep: #1d8fcd;
+  --shadow: 0 18px 60px rgba(15, 31, 44, 0.12);
+}
+
+[data-theme="dark"] {
+  --background: #0f1720;
+  --foreground: #e6eef5;
+  --panel: #18232d;
+  --card: #16222d;
+  --card-alt: #1b2c3a;
+  --message-card: var(--panel);
+  --message-meta: rgba(27, 44, 58, 0.88);
+  --shell: linear-gradient(180deg, rgba(21,32,43,0.98), rgba(16,25,34,0.96));
+  --shell-strong: rgba(27, 44, 58, 0.72);
+  --line: rgba(146, 181, 206, 0.16);
+  --muted: #8aa3b7;
+  --accent: #2aabee;
+  --accent-deep: #1d8fcd;
+  --shadow: 0 18px 60px rgba(0, 0, 0, 0.34);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(42, 171, 238, 0.18), transparent 28%),
+    linear-gradient(180deg, #eef5fb 0%, #dce7f1 100%);
+}
+
+[data-theme="dark"] html,
+html[data-theme="dark"] {
+  background:
+    radial-gradient(circle at top left, rgba(42, 171, 238, 0.14), transparent 24%),
+    linear-gradient(180deg, #15202b 0%, #101922 100%);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(42, 171, 238, 0.28);
+}
+
+.message-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.message-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.message-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(88, 113, 132, 0.32);
+  background-clip: padding-box;
+}
