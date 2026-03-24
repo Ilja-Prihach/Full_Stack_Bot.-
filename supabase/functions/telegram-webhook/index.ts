@@ -28,8 +28,19 @@ Deno.serve({ port: PORT }, async (request) => {
 
   console.log("Incoming message:", messageText);
 
-  if (!chatId || !userId || !TELEGRAM_BOT_TOKEN || !supabase) {
-    return Response.json({ ok: false }, { status: 400 });
+  if (!chatId || !userId || !text) {
+    console.log("Skipping unsupported update");
+    return new Response("OK", { status: 200 });
+  }
+
+  if (!TELEGRAM_BOT_TOKEN || !supabase) {
+    console.error("Missing TELEGRAM_BOT_TOKEN or Supabase config", {
+      hasTelegramToken: Boolean(TELEGRAM_BOT_TOKEN),
+      hasSupabaseUrl: Boolean(SUPABASE_URL),
+      hasServiceRoleKey: Boolean(SUPABASE_SERVICE_ROLE_KEY),
+      hasSupabaseClient: Boolean(supabase),
+    });
+    return new Response("Server misconfigured", { status: 500 });
   }
 
   const { error } = await supabase.from("messages").insert({
