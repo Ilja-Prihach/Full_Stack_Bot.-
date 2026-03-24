@@ -4,7 +4,14 @@
 }
 
 .statsGrid {
-  min-width: 20rem;
+  width: 100%;
+}
+
+@media (min-width: 640px) {
+  .statsGrid {
+    min-width: 20rem;
+    width: auto;
+  }
 }
 
 .statCard {

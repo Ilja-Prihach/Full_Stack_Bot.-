@@ -9,13 +9,13 @@ type MessagePanelProps = {
 
 export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
   return (
-    <section className={`${styles.mainPanel} min-h-0 rounded-[28px] border`}>
-      <div className="flex h-full min-h-0 flex-col">
+    <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
+      <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
         <div
-          className={`${styles.panelHeader} flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between`}
+          className={`${styles.panelHeader} flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5`}
         >
           <div className="min-w-0">
-            <div className="truncate text-xl font-semibold">
+            <div className="truncate text-lg font-semibold sm:text-xl">
               {selectedChat?.title ?? "Сообщения"}
             </div>
             <div className={`${styles.muted} truncate text-sm`}>
@@ -27,8 +27,8 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
           <div className={`${styles.muted} text-sm`}>{messages.length} сообщений</div>
         </div>
 
-        <div className="message-scrollbar min-h-0 flex-1 overflow-y-auto p-4">
-          <div className="grid gap-4">
+        <div className="message-scrollbar min-w-0 overflow-x-hidden p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+          <div className="grid min-w-0 gap-4">
             {messages.length === 0 ? (
               <div
                 className="rounded-[24px] border px-6 py-12 text-center"
@@ -43,10 +43,10 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
               messages.map((message) => (
                 <article
                   key={message.id}
-                  className={`${styles.messageCard} max-w-3xl rounded-[28px] border p-5 transition-transform duration-150 hover:-translate-y-0.5`}
+                  className={`${styles.messageCard} w-full min-w-0 max-w-full overflow-hidden rounded-[24px] border p-4 transition-transform duration-150 hover:-translate-y-0.5 lg:max-w-3xl sm:rounded-[28px] sm:p-5`}
                 >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
+                  <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 w-full">
                       <div className="flex items-center gap-3">
                         <div
                           className={`${styles.avatar} flex h-11 w-11 items-center justify-center rounded-full text-base font-semibold text-white`}
@@ -63,13 +63,13 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
                         </div>
                       </div>
 
-                      <p className="mt-4 whitespace-pre-wrap text-[15px] leading-7">
+                      <p className="mt-4 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14px] leading-6 sm:text-[15px] sm:leading-7">
                         {message.text}
                       </p>
                     </div>
 
                     <div
-                      className={`${styles.messageMeta} min-w-fit rounded-2xl border px-4 py-3 text-sm`}
+                      className={`${styles.messageMeta} w-full max-w-full rounded-2xl border px-4 py-3 text-sm sm:w-auto sm:min-w-fit`}
                     >
                       <div className={styles.muted}>Отправлено</div>
                       <div className="mt-1 font-medium">{formatTime(message.created_at)}</div>
@@ -77,12 +77,12 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
                   </div>
 
                   <div
-                    className={`${styles.messageDivider} mt-4 flex flex-wrap gap-2 border-t pt-4 text-sm`}
+                    className={`${styles.messageDivider} mt-4 flex min-w-0 flex-wrap gap-2 border-t pt-4 text-sm`}
                   >
-                    <span className={`${styles.badgePrimary} rounded-full px-3 py-1`}>
+                    <span className={`${styles.badgePrimary} max-w-full break-all rounded-full px-3 py-1`}>
                       Chat ID: {message.chat_id}
                     </span>
-                    <span className={`${styles.badgeMuted} rounded-full px-3 py-1`}>
+                    <span className={`${styles.badgeMuted} max-w-full break-all rounded-full px-3 py-1`}>
                       Message #{message.id}
                     </span>
                   </div>

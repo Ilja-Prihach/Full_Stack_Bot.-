@@ -22,9 +22,9 @@ export function ChatSidebar({
   onRefresh,
 }: ChatSidebarProps) {
   return (
-    <aside className={`${styles.sidebar} min-h-0 rounded-[28px] border p-4`}>
-      <div className="flex h-full min-h-0 flex-col">
-        <div className="flex items-center justify-between gap-3">
+    <aside className={`${styles.sidebar} min-w-0 overflow-hidden rounded-[24px] border p-3 sm:p-4 lg:min-h-0 lg:rounded-[28px]`}>
+      <div className="flex min-w-0 flex-col gap-3 lg:h-full lg:min-h-0 lg:gap-0">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-lg font-semibold">Чаты</div>
             <div className={`${styles.muted} text-sm`}>{chats.length} найдено</div>
@@ -32,14 +32,14 @@ export function ChatSidebar({
           <button
             type="button"
             onClick={onRefresh}
-            className={`${styles.refreshButton} rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity disabled:cursor-wait disabled:opacity-70`}
+            className={`${styles.refreshButton} w-full rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity disabled:cursor-wait disabled:opacity-70 sm:w-auto`}
             disabled={isRefreshing}
           >
             {isRefreshing ? "Обновление..." : "Обновить"}
           </button>
         </div>
 
-        <label className="mt-4 block">
+        <label className="block lg:mt-4">
           <span className={`${styles.muted} mb-2 block text-sm font-medium`}>Поиск</span>
           <input
             value={searchQuery}
@@ -49,7 +49,7 @@ export function ChatSidebar({
           />
         </label>
 
-        <div className="message-scrollbar mt-4 grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1">
+        <div className="message-scrollbar min-w-0 overflow-x-hidden grid gap-2 pr-1 lg:mt-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
           {chats.length === 0 ? (
             <div
               className={`${styles.muted} rounded-2xl border px-4 py-5 text-sm`}
@@ -66,10 +66,10 @@ export function ChatSidebar({
                   key={chat.chatId}
                   type="button"
                   onClick={() => onSelectChat(chat.chatId)}
-                  className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full rounded-[24px] border px-4 py-4 text-left transition`}
+                  className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold">{chat.title}</div>
                       <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
                     </div>

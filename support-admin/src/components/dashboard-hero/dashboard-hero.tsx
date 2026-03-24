@@ -38,33 +38,33 @@ export function DashboardHero({
 }: DashboardHeroProps) {
   return (
     <section
-      className={`${styles.heroSection} overflow-hidden rounded-[32px] border p-6 shadow-[var(--shadow)] sm:px-8 sm:py-6`}
+      className={`${styles.heroSection} overflow-hidden rounded-[28px] border px-4 py-5 shadow-[var(--shadow)] sm:px-6 sm:py-6 lg:rounded-[32px] lg:px-8`}
     >
-      <div className="flex flex-col gap-4 text-white sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 text-white sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-sm font-medium uppercase tracking-[0.28em] text-white/72">
+          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-white/72 sm:text-sm sm:tracking-[0.28em]">
             Telegram-style dashboard
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:mt-3 sm:text-3xl lg:text-4xl">
             SupportBot — Сообщения
           </h1>
         </div>
 
-        <div className={`${styles.statsGrid} grid grid-cols-2 gap-3 text-sm`}>
-          <div className={`${styles.statCard} rounded-2xl p-4`}>
+        <div className={`${styles.statsGrid} grid grid-cols-2 gap-2 text-sm sm:gap-3`}>
+          <div className={`${styles.statCard} min-w-0 rounded-2xl p-3 sm:p-4`}>
             <div className="text-white/68">Всего сообщений</div>
-            <div className="mt-2 text-2xl font-semibold">{totalMessages}</div>
+            <div className="mt-2 text-xl font-semibold sm:text-2xl">{totalMessages}</div>
           </div>
-          <div className={`${styles.statCard} rounded-2xl p-4`}>
+          <div className={`${styles.statCard} min-w-0 rounded-2xl p-3 sm:p-4`}>
             <div className="text-white/68">Чатов</div>
-            <div className="mt-2 text-2xl font-semibold">{totalChats}</div>
+            <div className="mt-2 text-xl font-semibold sm:text-2xl">{totalChats}</div>
           </div>
         </div>
 
         <button
           type="button"
           onClick={onToggleTheme}
-          className={`${styles.themeToggle} flex h-12 w-12 items-center justify-center rounded-full text-white transition sm:self-start`}
+          className={`${styles.themeToggle} flex h-11 w-11 items-center justify-center rounded-full text-white transition sm:h-12 sm:w-12 lg:self-start`}
           aria-label={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
           title={theme === "light" ? "Темная тема" : "Светлая тема"}
         >

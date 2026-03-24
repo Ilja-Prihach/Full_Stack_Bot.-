@@ -76,8 +76,8 @@ export function AdminDashboard({
   }, [theme]);
 
   return (
-    <main className="h-screen overflow-hidden px-4 py-4 sm:px-6 lg:px-8">
-      <div className="mx-auto flex h-full w-full max-w-7xl flex-col gap-4">
+    <main className="min-h-screen overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:h-screen lg:overflow-hidden lg:px-8 lg:py-4">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 lg:h-full lg:gap-4">
         <DashboardHero
           totalMessages={initialMessages.length}
           totalChats={chatPreviews.length}
@@ -88,14 +88,14 @@ export function AdminDashboard({
         />
 
         <section
-          className={`${styles.shell} min-h-0 flex-1 rounded-[32px] border p-4 shadow-[var(--shadow)] sm:p-5`}
+          className={`${styles.shell} rounded-[28px] border p-3 shadow-[var(--shadow)] sm:p-4 lg:min-h-0 lg:flex-1 lg:rounded-[32px] lg:p-5`}
         >
           {errorMessage ? (
             <div className="rounded-[24px] border border-red-200 bg-red-50 p-6 text-red-700">
               Не удалось загрузить сообщения из Supabase: {errorMessage}
             </div>
           ) : (
-            <div className="grid h-full min-h-0 gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="grid gap-3 lg:h-full lg:min-h-0 lg:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
               <ChatSidebar
                 chats={visibleChats}
                 activeChatId={activeChatId}
