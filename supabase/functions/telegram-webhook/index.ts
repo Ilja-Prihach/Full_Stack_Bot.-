@@ -33,6 +33,23 @@ Deno.serve({ port: PORT }, async (request) => {
     return new Response("OK", { status: 200 });
   }
 
+  if (text.trim() === "/start") {
+    console.log("Handling /start command");
+
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: "Привет! Я бот поддержки.\nОтправьте сюда ваш вопрос или сообщение, и менеджер увидит его в админке.",
+      }),
+    });
+
+    return new Response("OK", { status: 200 });
+  }
+
   if (!TELEGRAM_BOT_TOKEN || !supabase) {
     console.error("Missing TELEGRAM_BOT_TOKEN or Supabase config", {
       hasTelegramToken: Boolean(TELEGRAM_BOT_TOKEN),
