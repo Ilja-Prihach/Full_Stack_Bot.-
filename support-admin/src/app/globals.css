@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+:root {
+  --background: #dfe8f0;
+  --foreground: #14212b;
+  --panel: #eff4f8;
+  --card: #ffffff;
+  --card-alt: #e6f3ff;
+  --line: rgba(56, 86, 110, 0.18);
+  --muted: #587184;
+  --accent: #2aabee;
+  --accent-deep: #1d8fcd;
+  --shadow: 0 18px 60px rgba(15, 31, 44, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  background:
+    radial-gradient(circle at top left, rgba(42, 171, 238, 0.18), transparent 28%),
+    linear-gradient(180deg, #eef5fb 0%, #dce7f1 100%);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), sans-serif;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: rgba(42, 171, 238, 0.28);
+}
+
+.message-scrollbar::-webkit-scrollbar {
+  width: 10px;
+}
+
+.message-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.message-scrollbar::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: rgba(88, 113, 132, 0.32);
+  background-clip: padding-box;
+}
