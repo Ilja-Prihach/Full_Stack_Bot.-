@@ -1,0 +1,40 @@
+.mainPanel {
+  background: var(--card);
+  border-color: var(--line);
+}
+
+.panelHeader {
+  border-color: var(--line);
+}
+
+.messageCard {
+  background: var(--message-card);
+  border-color: var(--line);
+}
+
+.messageMeta {
+  background: var(--message-meta);
+  border-color: var(--line);
+}
+
+.avatar {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+}
+
+.messageDivider {
+  border-color: var(--line);
+}
+
+.badgePrimary {
+  background: rgba(42, 171, 238, 0.12);
+  color: var(--accent-deep);
+}
+
+.badgeMuted {
+  background: rgba(88, 113, 132, 0.08);
+  color: var(--muted);
+}
+
+.muted {
+  color: var(--muted);
+}

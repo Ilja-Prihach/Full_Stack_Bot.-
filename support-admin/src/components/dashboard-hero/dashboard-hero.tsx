@@ -1,0 +1,76 @@
+import styles from "./dashboard-hero.module.css";
+
+type DashboardHeroProps = {
+  totalMessages: number;
+  totalChats: number;
+  theme: "light" | "dark";
+  onToggleTheme: () => void;
+};
+
+function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
+  if (theme === "light") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+        <path d="M20 14.2A8 8 0 0 1 9.8 4 9 9 0 1 0 20 14.2Z" />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5 fill-current">
+      <circle cx="12" cy="12" r="4" />
+      <path
+        d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
+export function DashboardHero({
+  totalMessages,
+  totalChats,
+  theme,
+  onToggleTheme,
+}: DashboardHeroProps) {
+  return (
+    <section
+      className={`${styles.heroSection} overflow-hidden rounded-[32px] border p-6 shadow-[var(--shadow)] sm:px-8 sm:py-6`}
+    >
+      <div className="flex flex-col gap-4 text-white sm:flex-row sm:items-end sm:justify-between">
+        <div className="max-w-2xl">
+          <p className="text-sm font-medium uppercase tracking-[0.28em] text-white/72">
+            Telegram-style dashboard
+          </p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">
+            SupportBot — Сообщения
+          </h1>
+        </div>
+
+        <div className={`${styles.statsGrid} grid grid-cols-2 gap-3 text-sm`}>
+          <div className={`${styles.statCard} rounded-2xl p-4`}>
+            <div className="text-white/68">Всего сообщений</div>
+            <div className="mt-2 text-2xl font-semibold">{totalMessages}</div>
+          </div>
+          <div className={`${styles.statCard} rounded-2xl p-4`}>
+            <div className="text-white/68">Чатов</div>
+            <div className="mt-2 text-2xl font-semibold">{totalChats}</div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className={`${styles.themeToggle} flex h-12 w-12 items-center justify-center rounded-full text-white transition sm:self-start`}
+          aria-label={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
+          title={theme === "light" ? "Темная тема" : "Светлая тема"}
+        >
+          <ThemeIcon theme={theme} />
+        </button>
+      </div>
+    </section>
+  );
+}

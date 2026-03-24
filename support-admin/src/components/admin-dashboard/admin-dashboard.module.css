@@ -1,0 +1,4 @@
+.shell {
+  background: var(--shell);
+  border-color: var(--line);
+}

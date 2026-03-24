@@ -81,7 +81,7 @@ Deno.serve({ port: PORT }, async (request) => {
     },
     body: JSON.stringify({
       chat_id: chatId,
-      text: text ? `I got your message: "${text}"` : "I hear your message.",
+      text: "Спасибо! Ваше сообщение получено.",
     }),
   });
 

@@ -1,4 +1,4 @@
-import { AdminDashboard } from "@/components/admin-dashboard";
+import { AdminDashboard } from "@/components";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
