@@ -20,7 +20,7 @@ export default async function Home() {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(ADMIN_AUTH_COOKIE)?.value;
 
-  if (!verifyAdminSessionToken(sessionToken)) {
+  if (!(await verifyAdminSessionToken(sessionToken))) {
     redirect("/login");
   }
 

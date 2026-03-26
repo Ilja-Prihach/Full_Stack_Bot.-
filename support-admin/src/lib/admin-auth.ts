@@ -1,10 +1,10 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
 export const ADMIN_AUTH_COOKIE = "support-admin-session";
 
 const DEFAULT_ADMIN_LOGIN = "admin";
 const DEFAULT_ADMIN_PASSWORD = "admin";
 const SESSION_PAYLOAD = "support-admin";
+
+const encoder = new TextEncoder();
 
 function getAuthSecret() {
   const secret = process.env.ADMIN_AUTH_SECRET;
@@ -28,15 +28,52 @@ export function getAdminPassword() {
   return process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 }
 
-function createSessionSignature(payload: string) {
-  return createHmac("sha256", getAuthSecret()).update(payload).digest("hex");
+async function importHmacKey() {
+  return await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(getAuthSecret()),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign", "verify"],
+  );
 }
 
-export function createAdminSessionToken() {
-  return `${SESSION_PAYLOAD}.${createSessionSignature(SESSION_PAYLOAD)}`;
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-export function verifyAdminSessionToken(token?: string | null) {
+function hexToBytes(hex: string) {
+  if (hex.length % 2 !== 0) {
+    return null;
+  }
+
+  const bytes = new Uint8Array(hex.length / 2);
+
+  for (let index = 0; index < hex.length; index += 2) {
+    const value = Number.parseInt(hex.slice(index, index + 2), 16);
+
+    if (Number.isNaN(value)) {
+      return null;
+    }
+
+    bytes[index / 2] = value;
+  }
+
+  return bytes;
+}
+
+async function createSessionSignature(payload: string) {
+  const key = await importHmacKey();
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+
+  return bytesToHex(new Uint8Array(signature));
+}
+
+export async function createAdminSessionToken() {
+  return `${SESSION_PAYLOAD}.${await createSessionSignature(SESSION_PAYLOAD)}`;
+}
+
+export async function verifyAdminSessionToken(token?: string | null) {
   if (!token) {
     return false;
   }
@@ -47,9 +84,14 @@ export function verifyAdminSessionToken(token?: string | null) {
     return false;
   }
 
-  const expectedSignature = createSessionSignature(payload);
+  const key = await importHmacKey();
+  const signatureBytes = hexToBytes(signature);
 
-  return timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
+  if (!signatureBytes) {
+    return false;
+  }
+
+  return await crypto.subtle.verify("HMAC", key, signatureBytes, encoder.encode(payload));
 }
 
 export function isValidAdminCredentials(login: string, password: string) {
