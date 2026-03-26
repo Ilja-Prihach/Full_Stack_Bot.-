@@ -1,0 +1,68 @@
+@startuml
+title SupportBot - Component Diagram
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam ArrowColor #4b5563
+skinparam ArrowThickness 1.2
+skinparam RectangleBorderColor #1f2937
+skinparam RectangleBackgroundColor #f8fafc
+skinparam PackageBorderColor #1f2937
+skinparam PackageBackgroundColor #eef2ff
+skinparam DatabaseBorderColor #1f2937
+skinparam DatabaseBackgroundColor #ecfeff
+skinparam ActorBorderColor #1f2937
+skinparam ActorBackgroundColor #fef3c7
+
+actor "Support Manager" as SupportManager
+rectangle "Browser" as Browser
+rectangle "Telegram Bot API" as TelegramApi
+database "Supabase Postgres\npublic.messages" as MessagesDb
+
+package "support-admin" as SupportAdmin {
+  rectangle "page.tsx\nSSR entrypoint" as Page
+  rectangle "supabase.ts\ncreateClient(...)" as FrontSupabase
+  rectangle "AdminDashboard\nsearch, selection, refresh, theme" as AdminDashboard
+  rectangle "dashboard-shared\ngetChatPreviews / format helpers / types" as DashboardShared
+  rectangle "DashboardHero\nsummary header" as DashboardHero
+  rectangle "ChatSidebar\nchat list + search + router.refresh()" as ChatSidebar
+  rectangle "MessagePanel\nselected chat transcript" as MessagePanel
+}
+
+package "telegram-webhook" as TelegramWebhook {
+  rectangle "index.ts\nHTTP entrypoint" as WebhookIndex
+  rectangle "handlers.ts\n/start and inbound message flow" as WebhookHandlers
+  rectangle "telegram.ts\nupdate parsing + sendMessage wrapper" as WebhookTelegram
+  rectangle "messages.ts\nSupabase insert adapter" as WebhookMessages
+  rectangle "config.ts\nenvironment variables" as WebhookConfig
+}
+
+SupportManager --> Browser : uses
+Browser --> Page : requests /
+Page --> FrontSupabase : imports client
+Page --> MessagesDb : select * from messages order by created_at desc
+Page --> AdminDashboard : passes initialMessages and error state
+
+AdminDashboard --> DashboardHero : renders stats
+AdminDashboard --> ChatSidebar : renders chat navigation
+AdminDashboard --> MessagePanel : renders selected chat
+AdminDashboard --> DashboardShared : getChatPreviews, getDisplayName, getUsernameLabel
+ChatSidebar --> DashboardShared : formatTime
+MessagePanel --> DashboardShared : formatTime, getDisplayName, getUsernameLabel
+ChatSidebar --> Page : triggers router.refresh via Next.js navigation
+
+TelegramApi --> WebhookIndex : POST update
+WebhookIndex --> WebhookTelegram : extractTelegramMessage(update)
+WebhookIndex --> WebhookHandlers : dispatches /start or text flow
+WebhookHandlers --> WebhookConfig : validates env presence
+WebhookHandlers --> WebhookMessages : saveIncomingMessage(...)
+WebhookHandlers --> WebhookTelegram : sendTelegramMessage(...)
+WebhookMessages --> WebhookConfig : reads Supabase URL and service key
+WebhookMessages --> MessagesDb : insert inbound row
+WebhookTelegram --> WebhookConfig : reads bot token
+WebhookTelegram --> TelegramApi : POST /sendMessage
+
+@enduml
