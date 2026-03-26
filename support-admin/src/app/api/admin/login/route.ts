@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
   response.cookies.set({
     name: ADMIN_AUTH_COOKIE,
-    value: createAdminSessionToken(),
+    value: await createAdminSessionToken(),
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
