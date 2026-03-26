@@ -1,0 +1,44 @@
+@startuml
+title SupportBot - System Context
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam ArrowColor #4b5563
+skinparam ArrowThickness 1.2
+skinparam RectangleBorderColor #1f2937
+skinparam RectangleBackgroundColor #f8fafc
+skinparam PackageBorderColor #1f2937
+skinparam PackageBackgroundColor #eef2ff
+skinparam DatabaseBorderColor #1f2937
+skinparam DatabaseBackgroundColor #ecfeff
+skinparam ActorBorderColor #1f2937
+skinparam ActorBackgroundColor #fef3c7
+
+actor "Telegram User" as TelegramUser
+actor "Support Manager" as SupportManager
+rectangle "Telegram Bot API" as TelegramApi
+
+package "SupportBot" as SupportBot {
+  rectangle "support-admin\nNext.js admin dashboard" as SupportAdmin
+  rectangle "telegram-webhook\nSupabase Edge Function" as TelegramWebhook
+  database "Supabase Postgres\npublic.messages" as MessagesDb
+}
+
+rectangle "Supabase Platform" as SupabasePlatform
+
+TelegramUser --> TelegramApi : sends support message
+TelegramApi --> TelegramWebhook : forwards webhook update
+TelegramWebhook --> MessagesDb : persists inbound message
+TelegramWebhook --> TelegramApi : sends acknowledgement
+
+SupportManager --> SupportAdmin : opens dashboard
+SupportAdmin --> MessagesDb : reads message history
+
+TelegramWebhook --> SupabasePlatform : deployed on
+MessagesDb --> SupabasePlatform : hosted by
+SupportAdmin --> SupabasePlatform : uses project URL and anon key
+
+@enduml

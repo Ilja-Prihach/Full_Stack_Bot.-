@@ -15,6 +15,7 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
   const router = useRouter();
   const [isRefreshing, startRefresh] = useTransition();
+  const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
@@ -56,7 +57,6 @@ export function AdminDashboard({
   });
 
   const selectedChat = visibleChats.find((chat) => chat.chatId === activeChatId) ?? null;
-
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("support-admin-theme");
 
@@ -75,6 +75,14 @@ export function AdminDashboard({
     window.localStorage.setItem("support-admin-theme", theme);
   }, [theme]);
 
+  function handleLogout() {
+    startLogout(async () => {
+      await fetch("/api/admin/logout", { method: "POST" });
+      router.replace("/login");
+      router.refresh();
+    });
+  }
+
   return (
     <main className="min-h-screen overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:h-screen lg:overflow-hidden lg:px-8 lg:py-4">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 lg:h-full lg:gap-4">
@@ -82,6 +90,8 @@ export function AdminDashboard({
           totalMessages={initialMessages.length}
           totalChats={chatPreviews.length}
           theme={theme}
+          isLoggingOut={isLoggingOut}
+          onLogout={handleLogout}
           onToggleTheme={() =>
             setTheme((currentTheme) => (currentTheme === "light" ? "dark" : "light"))
           }

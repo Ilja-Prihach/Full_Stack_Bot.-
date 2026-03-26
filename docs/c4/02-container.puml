@@ -1,0 +1,51 @@
+@startuml
+title SupportBot - Container Diagram
+
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam linetype ortho
+skinparam defaultTextAlignment center
+skinparam ArrowColor #4b5563
+skinparam ArrowThickness 1.2
+skinparam RectangleBorderColor #1f2937
+skinparam RectangleBackgroundColor #f8fafc
+skinparam PackageBorderColor #1f2937
+skinparam PackageBackgroundColor #eef2ff
+skinparam DatabaseBorderColor #1f2937
+skinparam DatabaseBackgroundColor #ecfeff
+skinparam ActorBorderColor #1f2937
+skinparam ActorBackgroundColor #fef3c7
+
+actor "Telegram User" as TelegramUser
+actor "Support Manager" as SupportManager
+rectangle "Telegram Bot API" as TelegramApi
+rectangle "Browser" as Browser
+
+package "SupportBot Containers" as SupportBot {
+  package "support-admin" as SupportAdminBoundary {
+    rectangle "Next.js page renderer\nsrc/app/page.tsx" as NextPage
+    rectangle "Admin dashboard UI\nAdminDashboard + child components" as DashboardUi
+    rectangle "Supabase JS client\nsrc/lib/supabase.ts" as AdminSupabaseClient
+  }
+
+  package "Supabase Project" as SupabaseBoundary {
+    rectangle "telegram-webhook\nDeno HTTP function" as Webhook
+    database "Postgres table\npublic.messages" as MessagesDb
+  }
+}
+
+SupportManager --> Browser : uses
+Browser --> NextPage : requests admin page
+NextPage --> AdminSupabaseClient : creates query client
+NextPage --> MessagesDb : selects messages
+NextPage --> DashboardUi : passes initialMessages
+
+TelegramUser --> TelegramApi : sends message
+TelegramApi --> Webhook : POST update payload
+Webhook --> MessagesDb : inserts inbound message
+Webhook --> TelegramApi : POST sendMessage
+
+AdminSupabaseClient --> MessagesDb : connects with anon key
+
+@enduml

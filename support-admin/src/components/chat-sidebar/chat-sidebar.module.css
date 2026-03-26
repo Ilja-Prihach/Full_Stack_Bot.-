@@ -26,3 +26,14 @@
   background: rgba(42, 171, 238, 0.14);
   border-color: rgba(42, 171, 238, 0.35);
 }
+
+.chatList {
+  max-height: 23.5rem;
+  overscroll-behavior: contain;
+}
+
+@media (min-width: 1024px) {
+  .chatList {
+    max-height: none;
+  }
+}
