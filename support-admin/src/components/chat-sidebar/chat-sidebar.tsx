@@ -50,7 +50,7 @@ export function ChatSidebar({
         </label>
 
         <div
-          className={`${styles.chatList} message-scrollbar min-w-0 overflow-x-hidden overflow-y-auto grid gap-2 pr-1 lg:mt-4 lg:min-h-0 lg:flex-1`}
+          className={`${styles.chatList} message-scrollbar min-w-0 overflow-x-hidden overflow-y-auto grid auto-rows-max content-start gap-2 pr-1 lg:mt-4 lg:min-h-0 lg:flex-1`}
         >
           {chats.length === 0 ? (
             <div

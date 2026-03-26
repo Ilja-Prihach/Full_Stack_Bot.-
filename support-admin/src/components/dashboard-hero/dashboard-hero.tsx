@@ -5,6 +5,8 @@ type DashboardHeroProps = {
   totalChats: number;
   theme: "light" | "dark";
   onToggleTheme: () => void;
+  onLogout: () => void;
+  isLoggingOut: boolean;
 };
 
 function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
@@ -35,6 +37,8 @@ export function DashboardHero({
   totalChats,
   theme,
   onToggleTheme,
+  onLogout,
+  isLoggingOut,
 }: DashboardHeroProps) {
   return (
     <section
@@ -58,15 +62,26 @@ export function DashboardHero({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onToggleTheme}
-          className={`${styles.themeToggle} flex h-11 w-11 items-center justify-center rounded-full text-white transition sm:h-12 sm:w-12 lg:self-start`}
-          aria-label={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
-          title={theme === "light" ? "Темная тема" : "Светлая тема"}
-        >
-          <ThemeIcon theme={theme} />
-        </button>
+        <div className="flex items-center gap-2 lg:self-start">
+          <button
+            type="button"
+            onClick={onLogout}
+            disabled={isLoggingOut}
+            className={`${styles.logoutButton} rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity disabled:cursor-wait disabled:opacity-70`}
+          >
+            {isLoggingOut ? "Выход..." : "Выйти"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            className={`${styles.themeToggle} flex h-11 w-11 items-center justify-center rounded-full text-white transition sm:h-12 sm:w-12`}
+            aria-label={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
+            title={theme === "light" ? "Темная тема" : "Светлая тема"}
+          >
+            <ThemeIcon theme={theme} />
+          </button>
+        </div>
       </div>
     </section>
   );

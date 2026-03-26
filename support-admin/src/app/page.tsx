@@ -1,4 +1,7 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components";
+import { ADMIN_AUTH_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
 import { supabase } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -14,6 +17,13 @@ type Message = {
 };
 
 export default async function Home() {
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(ADMIN_AUTH_COOKIE)?.value;
+
+  if (!verifyAdminSessionToken(sessionToken)) {
+    redirect("/login");
+  }
+
   const { data: messages, error } = await supabase
     .from("messages")
     .select("*")
