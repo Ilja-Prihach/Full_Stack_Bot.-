@@ -42,9 +42,6 @@ export function DashboardHero({
     >
       <div className="flex flex-col gap-3 text-white sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-2xl">
-          <p className="text-[11px] font-medium uppercase tracking-[0.24em] text-white/72 sm:text-sm sm:tracking-[0.28em]">
-            Telegram-style dashboard
-          </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:mt-3 sm:text-3xl lg:text-4xl">
             SupportBot — Сообщения
           </h1>
