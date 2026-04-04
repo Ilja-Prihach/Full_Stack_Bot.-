@@ -6,7 +6,7 @@ import dashboardStyles from "../admin-dashboard/admin-dashboard.module.css";
 
 export function AdminLogin() {
   const router = useRouter();
-  const [login, setLogin] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,7 +23,7 @@ export function AdminLogin() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ login, password }),
+        body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
@@ -53,13 +53,14 @@ export function AdminLogin() {
 
           <form className="grid gap-4" onSubmit={handleSubmit}>
             <label className="grid gap-2">
-              <span className="text-sm font-medium">Логин</span>
+              <span className="text-sm font-medium">Email</span>
               <input
-                value={login}
-                onChange={(event) => setLogin(event.target.value)}
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
                 className="w-full rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-2"
                 style={{ background: "var(--shell-strong)", borderColor: "var(--line)" }}
-                autoComplete="username"
+                autoComplete="email"
               />
             </label>
 
