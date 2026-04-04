@@ -1,34 +1,44 @@
 import { NextResponse } from "next/server";
-import {
-  ADMIN_AUTH_COOKIE,
-  createAdminSessionToken,
-  isValidAdminCredentials,
-} from "@/lib/admin-auth";
+import { createClient } from "@supabase/supabase-js";
+import { setSupabaseSessionCookies } from "@/lib/admin-auth";
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error("Missing Supabase environment variables for support-admin.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 export async function POST(request: Request) {
-  const { login, password } = (await request.json()) as {
-    login?: string;
+  const { email, password } = (await request.json()) as {
+    email?: string;
     password?: string;
   };
 
-  if (!isValidAdminCredentials(login ?? "", password ?? "")) {
+  if (!email || !password) {
     return NextResponse.json(
-      { ok: false, error: "Неверный логин или пароль" },
+      { ok: false, error: "Email и пароль обязательны" },
+      { status: 400 },
+    );
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  });
+
+  if (error || !data.session) {
+    return NextResponse.json(
+      { ok: false, error: error?.message ?? "Не удалось выполнить вход" },
       { status: 401 },
     );
   }
 
   const response = NextResponse.json({ ok: true });
 
-  response.cookies.set({
-    name: ADMIN_AUTH_COOKIE,
-    value: await createAdminSessionToken(),
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  setSupabaseSessionCookies(response, data.session);
 
   return response;
 }
