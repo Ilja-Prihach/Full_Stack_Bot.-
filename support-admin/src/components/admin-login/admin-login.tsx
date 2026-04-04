@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import dashboardStyles from "../admin-dashboard/admin-dashboard.module.css";
@@ -133,6 +134,12 @@ export function AdminLogin() {
             >
               {isSubmitting ? "Вход..." : "Войти"}
             </button>
+
+            <div className="text-sm" style={{ color: "var(--muted)" }}>
+              <Link href="/forgot-password" className="font-medium underline underline-offset-4">
+                Забыли пароль?
+              </Link>
+            </div>
           </form>
         </section>
       </div>
