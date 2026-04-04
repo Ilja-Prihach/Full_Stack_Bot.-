@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { ADMIN_AUTH_COOKIE, verifyAdminSessionToken } from "@/lib/admin-auth";
+import { SUPABASE_ACCESS_TOKEN_COOKIE } from "@/lib/admin-auth";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -10,8 +10,8 @@ export async function middleware(request: NextRequest) {
   }
 
   const isLoginPage = pathname === "/login";
-  const token = request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
-  const isAuthenticated = await verifyAdminSessionToken(token);
+  const accessToken = request.cookies.get(SUPABASE_ACCESS_TOKEN_COOKIE)?.value;
+  const isAuthenticated = Boolean(accessToken);
 
   if (!isAuthenticated && !isLoginPage) {
     return NextResponse.redirect(new URL("/login", request.url));
