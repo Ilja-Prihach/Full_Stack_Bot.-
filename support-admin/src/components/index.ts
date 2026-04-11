@@ -5,4 +5,4 @@ export { AdminResetPassword } from "./admin-reset-password";
 export { ChatSidebar } from "./chat-sidebar";
 export { DashboardHero } from "./dashboard-hero";
 export { MessagePanel } from "./message-panel";
-export type { AdminDashboardProps, ChatPreview, Message } from "./dashboard-shared";
+export type { AdminDashboardProps, ChatPreview, ManagerProfile, Message } from "./dashboard-shared";

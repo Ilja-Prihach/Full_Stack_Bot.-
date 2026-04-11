@@ -4,17 +4,17 @@ import styles from "./chat-sidebar.module.css";
 
 type ChatSidebarProps = {
   chats: ChatPreview[];
-  activeChatId: number | null;
+  activeClientId: number | null;
   searchQuery: string;
   isRefreshing: boolean;
   onSearchChange: (value: string) => void;
-  onSelectChat: (chatId: number) => void;
+  onSelectChat: (clientId: number) => void;
   onRefresh: () => void;
 };
 
 export function ChatSidebar({
   chats,
-  activeChatId,
+  activeClientId,
   searchQuery,
   isRefreshing,
   onSearchChange,
@@ -44,7 +44,7 @@ export function ChatSidebar({
           <input
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Имя, username, chat id, текст"
+            placeholder="Имя, username, client id, текст"
             className={`${styles.searchInput} w-full rounded-2xl border px-4 py-3 text-sm outline-none transition focus:ring-2`}
           />
         </label>
@@ -61,13 +61,13 @@ export function ChatSidebar({
             </div>
           ) : (
             chats.map((chat) => {
-              const isActive = chat.chatId === activeChatId;
+              const isActive = chat.clientId === activeClientId;
 
               return (
                 <button
-                  key={chat.chatId}
+                  key={chat.clientId}
                   type="button"
-                  onClick={() => onSelectChat(chat.chatId)}
+                  onClick={() => onSelectChat(chat.clientId)}
                   className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
                 >
                   <div className="flex min-w-0 items-start justify-between gap-3">
@@ -80,6 +80,11 @@ export function ChatSidebar({
                     </div>
                   </div>
                   <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>
+                  {chat.telegramChatId ? (
+                    <div className={`${styles.muted} mt-2 truncate text-xs`}>
+                      Telegram chat: {chat.telegramChatId}
+                    </div>
+                  ) : null}
                   <div className={`${styles.muted} mt-2 text-xs`}>
                     {formatTime(chat.lastTimestamp)}
                   </div>

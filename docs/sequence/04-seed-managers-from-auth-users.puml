@@ -1,0 +1,25 @@
+@startuml
+title Инициализация managers из auth.users
+
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+participant "Supabase Migration Runner" as runner
+database "auth.users" as auth_users
+database "public.managers" as managers
+
+runner -> auth_users : Читает всех существующих\nпользователей auth
+auth_users --> runner : id, raw_user_meta_data
+runner -> managers : INSERT ... SELECT\nпо всем auth.users
+
+alt Менеджер уже существует
+  managers --> runner : on conflict do nothing
+else Менеджера ещё нет
+  managers --> runner : Создаёт профиль менеджера\nс дефолтными first_name/last_name,\nесли metadata пустая
+end
+
+runner --> managers : Завершает seed
+
+@enduml

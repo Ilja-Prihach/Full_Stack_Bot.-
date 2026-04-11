@@ -1,0 +1,37 @@
+@startuml
+title Появление клиента в системе
+
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Пользователь Telegram" as tg_user
+participant "Telegram" as telegram
+participant "telegram-webhook" as webhook
+database "public.clients" as clients
+database "public.messages" as messages
+participant "Admin UI" as ui
+
+tg_user -> telegram : Отправляет первое сообщение
+telegram -> webhook : Присылает webhook update\nmessage, chat, user
+webhook -> clients : Ищет клиента по telegram_chat_id\nили telegram_user_id
+
+alt Клиент уже существует
+  clients --> webhook : Существующий клиент
+else Первое сообщение от клиента
+  clients --> webhook : Запись отсутствует
+  webhook -> clients : Создаёт клиента\ntelegram_user_id, telegram_chat_id,\nusername, first_name, last_name,\ncreated_at = now()
+  clients --> webhook : Клиент создан
+end
+
+webhook -> messages : Создаёт сообщение\nclient_id, sender_type = client,\nsender_manager_id = NULL,\nsender_label = username/first_name,\ntext, created_at = now()
+messages --> webhook : Сообщение сохранено
+webhook --> telegram : 200 OK
+
+ui -> clients : Запрашивает список чатов
+clients --> ui : Клиенты для боковой панели
+ui -> messages : Запрашивает сообщения по client_id
+messages --> ui : История переписки
+
+@enduml

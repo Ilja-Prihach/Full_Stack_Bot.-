@@ -8,33 +8,56 @@ export function formatTime(timestamp: string) {
 }
 
 export function getDisplayName(message: Message) {
-  const fullName = [message.first_name, message.last_name].filter(Boolean).join(" ");
+  if (message.sender_type === "manager") {
+    return message.sender_label || "Менеджер";
+  }
 
-  return message.username || fullName || "Unknown user";
+  const fullName = [message.client?.first_name, message.client?.last_name]
+    .filter(Boolean)
+    .join(" ");
+
+  return message.client?.username || fullName || message.sender_label || "Unknown user";
 }
 
 export function getUsernameLabel(message: Message) {
-  return message.username ? `@${message.username}` : "без username";
+  if (message.sender_type === "manager") {
+    return "менеджер";
+  }
+
+  return message.client?.username ? `@${message.client.username}` : "без username";
+}
+
+export function getClientDisplayName(message: Message) {
+  const fullName = [message.client?.first_name, message.client?.last_name]
+    .filter(Boolean)
+    .join(" ");
+
+  return message.client?.username || fullName || "Unknown user";
+}
+
+export function getClientUsernameLabel(message: Message) {
+  return message.client?.username ? `@${message.client.username}` : "без username";
 }
 
 export function getChatPreviews(messages: Message[]) {
   const byChat = new Map<number, Message[]>();
 
   for (const message of messages) {
-    const existing = byChat.get(message.chat_id) ?? [];
+    const existing = byChat.get(message.client_id) ?? [];
     existing.push(message);
-    byChat.set(message.chat_id, existing);
+    byChat.set(message.client_id, existing);
   }
 
   const previews: ChatPreview[] = [];
 
-  for (const [chatId, chatMessages] of byChat.entries()) {
+  for (const [clientId, chatMessages] of byChat.entries()) {
     const latestMessage = chatMessages[0];
 
     previews.push({
-      chatId,
-      title: getDisplayName(latestMessage),
-      subtitle: getUsernameLabel(latestMessage),
+      clientId,
+      telegramChatId: latestMessage.client?.telegram_chat_id ?? null,
+      title: getClientDisplayName(latestMessage),
+      subtitle: getClientUsernameLabel(latestMessage),
       lastMessage: latestMessage.text,
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,

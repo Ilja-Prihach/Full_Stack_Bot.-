@@ -1,0 +1,130 @@
+@startuml
+title SupportBot Supabase ERD
+
+left to right direction
+hide circle
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 140
+skinparam ranksep 150
+skinparam entity {
+  BackgroundColor white
+  BorderColor black
+}
+
+entity "auth.users" as auth_users {
+  * id : uuid <<PK>>
+  --
+  email : text
+  created_at : timestamptz
+}
+
+entity "public.messages" as messages {
+  * id : bigint <<PK>>
+  --
+  chat_id : bigint <<LEGACY>>
+  user_id : bigint <<LEGACY>>
+  username : varchar(255) <<LEGACY>>
+  first_name : varchar(255) <<LEGACY>>
+  last_name : varchar(255) <<LEGACY>>
+  client_id : bigint <<FK>>
+  * sender_type : text
+  sender_manager_id : bigint <<FK>>
+  * sender_label : varchar(255)
+  * text : text
+  * created_at : timestamptz = now()
+}
+
+entity "public.managers" as managers {
+  * id : bigint <<PK>>
+  --
+  * auth_user_id : uuid <<FK>>
+  * email : text <<UNIQUE>>
+  * first_name : varchar(255)
+  * last_name : varchar(255)
+  * position : varchar(255)
+  * created_at : timestamptz = now()
+}
+
+entity "public.clients" as clients {
+  * id : bigint <<PK>>
+  --
+  * telegram_user_id : bigint <<UNIQUE>>
+  * telegram_chat_id : bigint <<UNIQUE>>
+  username : varchar(32)
+  first_name : varchar(64)
+  last_name : varchar(64)
+  * created_at : timestamptz = now()
+}
+
+entity "public.client_assignments" as client_assignments {
+  * id : bigint <<PK>>
+  --
+  * client_id : bigint <<FK, UNIQUE>>
+  assigned_manager_id : bigint <<FK>>
+  previous_manager_id : bigint <<FK>>
+  last_reassigned_by_manager_id : bigint <<FK>>
+  last_reassigned_by_manager_name : varchar(255)
+  * created_at : timestamptz = now()
+  updated_at : timestamptz
+}
+
+auth_users -[hidden]down- managers
+managers -[hidden]right- clients
+clients -[hidden]right- client_assignments
+client_assignments -[hidden]down- messages
+
+auth_users ||--o{ managers : "auth user"
+clients ||--|| client_assignments : "assignment"
+managers ||--o{ client_assignments : "current manager"
+managers ||--o{ client_assignments : "previous manager"
+managers ||--o{ client_assignments : "reassigned by"
+managers ||--o{ messages : "manager sender"
+clients ||--o{ messages : "messages"
+
+note right of messages
+  Messages belong to one client.
+  Supports both client and
+  manager messages.
+  Text is stored here, not in clients.
+
+  Legacy source columns
+  chat_id, user_id, username,
+  first_name, last_name still exist
+  for transition compatibility.
+
+  RLS is enabled on the
+  current messages table.
+  Access is manager-only.
+  Realtime publication is enabled.
+end note
+
+note right of managers
+  Stores admin identities
+  mapped to Supabase Auth users.
+  Existing auth users are seeded
+  into managers by migration.
+  RLS allows manager-only access.
+end note
+
+note right of clients
+  Stores unique client identity
+  for chat list and CRM-style UI.
+  Parent entity for messages.
+  RLS allows manager-only access.
+end note
+
+note right of client_assignments
+  One row per client.
+  Stores current assignee,
+  previous assignee and
+  who made the last reassignment.
+  Keeps optional manager name
+  snapshot for clearer UI.
+
+  Manager fields may be NULL.
+  RLS allows manager-only access.
+end note
+
+@enduml
