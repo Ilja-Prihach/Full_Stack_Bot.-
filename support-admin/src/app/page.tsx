@@ -7,6 +7,14 @@ import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
+type RawMessage = Omit<Message, "client"> & {
+  client: Message["client"] extends infer Client
+    ? Client extends null
+      ? never
+      : Client[]
+    : never;
+};
+
 export default async function Home() {
   const cookieStore = await cookies();
   const { accessToken } = getSupabaseSessionCookies(cookieStore);
@@ -54,7 +62,10 @@ export default async function Home() {
         .order("first_name", { ascending: true }),
     ]);
 
-  const typedMessages = (messages ?? []) as Message[];
+  const typedMessages: Message[] = ((messages ?? []) as RawMessage[]).map((message) => ({
+    ...message,
+    client: message.client[0] ?? null,
+  }));
   const managers = (managersData ?? []) as ManagerProfile[];
   const currentManager =
     managers.find((manager) => manager.auth_user_id === userData.user?.id) ?? null;
