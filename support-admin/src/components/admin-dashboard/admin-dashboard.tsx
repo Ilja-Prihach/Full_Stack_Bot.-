@@ -2,6 +2,7 @@
 
 import { useEffect, useDeferredValue, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { getBrowserRealtimeClient } from "@/lib/supabase";
 import { ChatSidebar } from "../chat-sidebar";
 import { DashboardHero } from "../dashboard-hero";
 import type { AdminDashboardProps } from "../dashboard-shared";
@@ -59,6 +60,18 @@ export function AdminDashboard({
       message.text.toLowerCase().includes(normalizedQuery)
     );
   });
+  const orderedVisibleMessages = [...visibleMessages].sort(
+    (left, right) => {
+      const createdAtDiff =
+        new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+
+      if (createdAtDiff !== 0) {
+        return createdAtDiff;
+      }
+
+      return Number(left.id) - Number(right.id);
+    },
+  );
 
   const selectedChat = visibleChats.find((chat) => chat.clientId === activeClientId) ?? null;
   useEffect(() => {
@@ -78,6 +91,31 @@ export function AdminDashboard({
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("support-admin-theme", theme);
   }, [theme]);
+
+  useEffect(() => {
+    const supabase = getBrowserRealtimeClient();
+
+    const channel = supabase
+      .channel("admin-messages-realtime")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "messages",
+        },
+        () => {
+          startRefresh(() => {
+            router.refresh();
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [router, startRefresh]);
 
   function handleLogout() {
     startLogout(async () => {
@@ -126,7 +164,7 @@ export function AdminDashboard({
                 }}
               />
 
-              <MessagePanel selectedChat={selectedChat} messages={visibleMessages} />
+              <MessagePanel selectedChat={selectedChat} messages={orderedVisibleMessages} />
             </div>
           )}
         </section>

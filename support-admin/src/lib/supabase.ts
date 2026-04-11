@@ -9,6 +9,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+let browserRealtimeClient: ReturnType<typeof createClient> | null = null;
+
 export function createAuthenticatedSupabaseClient(accessToken: string) {
   return createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
@@ -21,4 +23,21 @@ export function createAuthenticatedSupabaseClient(accessToken: string) {
       },
     },
   });
+}
+
+export function getBrowserRealtimeClient() {
+  if (typeof window === "undefined") {
+    throw new Error("Browser realtime client can only be created in the browser.");
+  }
+
+  if (!browserRealtimeClient) {
+    browserRealtimeClient = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+      },
+    });
+  }
+
+  return browserRealtimeClient;
 }
