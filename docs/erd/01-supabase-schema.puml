@@ -98,6 +98,8 @@ note right of managers
   Not created in migrations yet.
   Intended for admin identities
   mapped to Supabase Auth users.
+  Existing auth users are seeded
+  into managers by migration.
   RLS will allow manager-only access.
 end note
 
