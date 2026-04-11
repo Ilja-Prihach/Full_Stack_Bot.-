@@ -24,6 +24,9 @@ entity "public.messages" as messages {
   * id : bigint <<PK>>
   --
   client_id : bigint <<FK>>
+  * sender_type : text
+  sender_manager_id : bigint <<FK>>
+  * sender_label : varchar(255)
   * text : text
   * created_at : timestamptz = now()
 }
@@ -71,6 +74,7 @@ clients ||--|| client_assignments : "assignment"
 managers ||--o{ client_assignments : "current manager"
 managers ||--o{ client_assignments : "previous manager"
 managers ||--o{ client_assignments : "reassigned by"
+managers ||--o{ messages : "manager sender"
 clients ||--o{ messages : "messages"
 
 note right of messages
@@ -79,10 +83,13 @@ note right of messages
   target normalized model.
 
   Messages belong to one client.
+  Supports both client and
+  manager messages.
   Text is stored here, not in clients.
 
-  RLS is already enabled on the
+  RLS is enabled on the
   current messages table.
+  Target access is manager-only.
 end note
 
 note right of managers
@@ -91,6 +98,7 @@ note right of managers
   Not created in migrations yet.
   Intended for admin identities
   mapped to Supabase Auth users.
+  RLS will allow manager-only access.
 end note
 
 note right of clients
@@ -99,6 +107,7 @@ note right of clients
   Stores unique client identity
   for chat list and CRM-style UI.
   Intended parent for messages.
+  RLS will allow manager-only access.
 end note
 
 note right of client_assignments
@@ -110,6 +119,7 @@ note right of client_assignments
   who made the last reassignment.
 
   Manager fields may be NULL.
+  RLS will allow manager-only access.
 end note
 
 @enduml

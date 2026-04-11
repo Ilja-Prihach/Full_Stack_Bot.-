@@ -25,7 +25,7 @@ else Первое сообщение от клиента
   clients --> webhook : Клиент создан
 end
 
-webhook -> messages : Создаёт сообщение\nclient_id, text, created_at = now()
+webhook -> messages : Создаёт сообщение\nclient_id, sender_type = client,\nsender_manager_id = NULL,\nsender_label = username/first_name,\ntext, created_at = now()
 messages --> webhook : Сообщение сохранено
 webhook --> telegram : 200 OK
 
