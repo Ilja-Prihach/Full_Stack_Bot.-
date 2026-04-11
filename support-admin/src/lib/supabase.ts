@@ -7,12 +7,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error("Missing Supabase environment variables for support-admin.");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const resolvedSupabaseUrl = supabaseUrl;
+const resolvedSupabaseAnonKey = supabaseAnonKey;
+
+export const supabase = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey);
 
 let browserRealtimeClient: ReturnType<typeof createClient> | null = null;
 
 export function createAuthenticatedSupabaseClient(accessToken: string) {
-  return createClient(supabaseUrl, supabaseAnonKey, {
+  return createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
     auth: {
       persistSession: false,
       autoRefreshToken: false,
@@ -31,7 +34,7 @@ export function getBrowserRealtimeClient() {
   }
 
   if (!browserRealtimeClient) {
-    browserRealtimeClient = createClient(supabaseUrl, supabaseAnonKey, {
+    browserRealtimeClient = createClient(resolvedSupabaseUrl, resolvedSupabaseAnonKey, {
       auth: {
         persistSession: false,
         autoRefreshToken: false,
