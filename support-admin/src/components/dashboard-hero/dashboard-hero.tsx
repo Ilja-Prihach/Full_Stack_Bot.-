@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { ManagerProfile } from "../dashboard-shared";
 import styles from "./dashboard-hero.module.css";
 
@@ -53,6 +54,36 @@ export function DashboardHero({
   onLogout,
   isLoggingOut,
 }: DashboardHeroProps) {
+  const managerMenuRef = useRef<HTMLDetailsElement | null>(null);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const managerMenu = managerMenuRef.current;
+
+      if (!managerMenu?.open) {
+        return;
+      }
+
+      if (event.target instanceof Node && !managerMenu.contains(event.target)) {
+        managerMenu.open = false;
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && managerMenuRef.current?.open) {
+        managerMenuRef.current.open = false;
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   return (
     <section
       className={`${styles.heroSection} rounded-[28px] border px-4 py-5 shadow-[var(--shadow)] sm:px-6 sm:py-6 lg:rounded-[32px] lg:px-8`}
@@ -76,7 +107,7 @@ export function DashboardHero({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 lg:self-start">
-          <details className={`${styles.managerMenu} min-w-0`}>
+          <details ref={managerMenuRef} className={`${styles.managerMenu} min-w-0`}>
             <summary
               className={`${styles.managerSummary} flex list-none items-center gap-3 rounded-full px-4 py-2 text-left text-white transition`}
             >
