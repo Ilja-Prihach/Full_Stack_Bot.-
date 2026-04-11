@@ -25,10 +25,10 @@ api -> assignments : Ищет назначение по client_id
 
 alt Назначение уже существует
   assignments --> api : Текущее назначение
-  api -> assignments : Обновляет assigned_manager_id\nprevious_manager_id = старый assigned\nlast_reassigned_by_manager_id = актёр\nupdated_at = now()
+  api -> assignments : Обновляет assigned_manager_id\nprevious_manager_id = старый assigned\nlast_reassigned_by_manager_id = актёр\nlast_reassigned_by_manager_name = имя актёра\nupdated_at = now()
 else Первое назначение клиента
   assignments --> api : Запись отсутствует
-  api -> assignments : Создаёт запись с client_id\nassigned_manager_id = target\nprevious_manager_id = NULL\nlast_reassigned_by_manager_id = актёр\ncreated_at = now()
+  api -> assignments : Создаёт запись с client_id\nassigned_manager_id = target\nprevious_manager_id = NULL\nlast_reassigned_by_manager_id = актёр\nlast_reassigned_by_manager_name = имя актёра\ncreated_at = now()
 end
 
 assignments --> api : Назначение сохранено
