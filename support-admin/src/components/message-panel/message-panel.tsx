@@ -20,7 +20,7 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
             </div>
             <div className={`${styles.muted} truncate text-sm`}>
               {selectedChat
-                ? `${selectedChat.subtitle} • Chat ID ${selectedChat.chatId}`
+                ? `${selectedChat.subtitle} • Client ID ${selectedChat.clientId}${selectedChat.telegramChatId ? ` • Telegram ${selectedChat.telegramChatId}` : ""}`
                 : "Выберите чат слева"}
             </div>
           </div>
@@ -80,7 +80,10 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
                     className={`${styles.messageDivider} mt-4 flex min-w-0 flex-wrap gap-2 border-t pt-4 text-sm`}
                   >
                     <span className={`${styles.badgePrimary} max-w-full break-all rounded-full px-3 py-1`}>
-                      Chat ID: {message.chat_id}
+                      Client ID: {message.client_id}
+                    </span>
+                    <span className={`${styles.badgeMuted} max-w-full break-all rounded-full px-3 py-1`}>
+                      {message.sender_type === "manager" ? "Менеджер" : "Клиент"}
                     </span>
                     <span className={`${styles.badgeMuted} max-w-full break-all rounded-full px-3 py-1`}>
                       Message #{message.id}

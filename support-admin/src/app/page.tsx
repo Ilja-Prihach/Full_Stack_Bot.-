@@ -1,20 +1,11 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components";
+import type { Message } from "@/components";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
-import { supabase } from "@/lib/supabase";
+import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-
-type Message = {
-  id: string | number;
-  chat_id: number;
-  username: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  text: string;
-  created_at: string;
-};
 
 export default async function Home() {
   const cookieStore = await cookies();
@@ -24,9 +15,27 @@ export default async function Home() {
     redirect("/login");
   }
 
+  const supabase = createAuthenticatedSupabaseClient(accessToken);
+
   const { data: messages, error } = await supabase
     .from("messages")
-    .select("*")
+    .select(
+      `
+        id,
+        client_id,
+        sender_type,
+        sender_label,
+        text,
+        created_at,
+        client:clients (
+          id,
+          telegram_chat_id,
+          username,
+          first_name,
+          last_name
+        )
+      `,
+    )
     .order("created_at", { ascending: false });
 
   const typedMessages = (messages ?? []) as Message[];

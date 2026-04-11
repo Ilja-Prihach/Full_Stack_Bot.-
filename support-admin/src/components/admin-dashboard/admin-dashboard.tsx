@@ -17,12 +17,12 @@ export function AdminDashboard({
   const [isRefreshing, startRefresh] = useTransition();
   const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
   const chatPreviews = getChatPreviews(initialMessages);
-  const activeChatId = selectedChatId ?? chatPreviews[0]?.chatId ?? null;
+  const activeClientId = selectedClientId ?? chatPreviews[0]?.clientId ?? null;
 
   const visibleChats = chatPreviews.filter((chat) => {
     if (!normalizedQuery) {
@@ -32,13 +32,14 @@ export function AdminDashboard({
     return (
       chat.title.toLowerCase().includes(normalizedQuery) ||
       chat.subtitle.toLowerCase().includes(normalizedQuery) ||
-      String(chat.chatId).includes(normalizedQuery) ||
+      String(chat.clientId).includes(normalizedQuery) ||
+      String(chat.telegramChatId ?? "").includes(normalizedQuery) ||
       chat.lastMessage.toLowerCase().includes(normalizedQuery)
     );
   });
 
   const visibleMessages = initialMessages.filter((message) => {
-    const matchesChat = activeChatId ? message.chat_id === activeChatId : true;
+    const matchesChat = activeClientId ? message.client_id === activeClientId : true;
 
     if (!matchesChat) {
       return false;
@@ -51,12 +52,13 @@ export function AdminDashboard({
     return (
       getDisplayName(message).toLowerCase().includes(normalizedQuery) ||
       getUsernameLabel(message).toLowerCase().includes(normalizedQuery) ||
-      String(message.chat_id).includes(normalizedQuery) ||
+      String(message.client_id).includes(normalizedQuery) ||
+      String(message.client?.telegram_chat_id ?? "").includes(normalizedQuery) ||
       message.text.toLowerCase().includes(normalizedQuery)
     );
   });
 
-  const selectedChat = visibleChats.find((chat) => chat.chatId === activeChatId) ?? null;
+  const selectedChat = visibleChats.find((chat) => chat.clientId === activeClientId) ?? null;
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("support-admin-theme");
 
@@ -108,11 +110,11 @@ export function AdminDashboard({
             <div className="grid gap-3 lg:h-full lg:min-h-0 lg:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
               <ChatSidebar
                 chats={visibleChats}
-                activeChatId={activeChatId}
+                activeClientId={activeClientId}
                 searchQuery={searchQuery}
                 isRefreshing={isRefreshing}
                 onSearchChange={setSearchQuery}
-                onSelectChat={setSelectedChatId}
+                onSelectChat={setSelectedClientId}
                 onRefresh={() => {
                   startRefresh(() => {
                     router.refresh();
