@@ -4,12 +4,6 @@ import { NextResponse } from "next/server";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
-const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
-
-if (!telegramBotToken) {
-  throw new Error("Missing TELEGRAM_BOT_TOKEN for support-admin.");
-}
-
 type RouteError = {
   error: string;
   status: number;
@@ -114,6 +108,12 @@ async function requireClient(
 }
 
 async function sendTelegramMessage(chatId: number, text: string) {
+  const telegramBotToken = process.env.TELEGRAM_BOT_TOKEN;
+
+  if (!telegramBotToken) {
+    throw createRouteError("Missing TELEGRAM_BOT_TOKEN for support-admin.", 500);
+  }
+
   const response = await fetch(`https://api.telegram.org/bot${telegramBotToken}/sendMessage`, {
     method: "POST",
     headers: {
