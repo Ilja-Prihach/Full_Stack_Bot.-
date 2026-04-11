@@ -15,6 +15,11 @@ type IncomingTelegramMessage = {
   text: string;
 };
 
+type SaveIncomingMessageResult = {
+  error: { message: string } | null;
+  shouldSendAutoReply: boolean;
+};
+
 export function hasSupabaseConfig() {
   return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && supabase);
 }
@@ -84,18 +89,46 @@ async function findOrCreateClient(message: IncomingTelegramMessage) {
   return createdClient;
 }
 
-export async function saveIncomingMessage(message: IncomingTelegramMessage) {
+async function hasManagerReply(clientId: number) {
+  if (!supabase) {
+    throw new Error("Supabase client is not configured");
+  }
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("id")
+    .eq("client_id", clientId)
+    .eq("sender_type", "manager")
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
+}
+
+export async function saveIncomingMessage(
+  message: IncomingTelegramMessage,
+): Promise<SaveIncomingMessageResult> {
   if (!supabase) {
     throw new Error("Supabase client is not configured");
   }
 
   const client = await findOrCreateClient(message);
+  const shouldSendAutoReply = !(await hasManagerReply(client.id));
 
-  return await supabase.from("messages").insert({
+  const { error } = await supabase.from("messages").insert({
     client_id: client.id,
     sender_type: "client",
     sender_manager_id: null,
     sender_label: getSenderLabel(message),
     text: message.text,
   });
+
+  return {
+    error,
+    shouldSendAutoReply,
+  };
 }

@@ -29,7 +29,7 @@ export async function handleIncomingTextMessage(message: TelegramMessageData) {
     return new Response("Server misconfigured", { status: 500 });
   }
 
-  const { error } = await saveIncomingMessage({
+  const { error, shouldSendAutoReply } = await saveIncomingMessage({
     chatId: message.chatId,
     userId: message.userId,
     username: message.username,
@@ -43,7 +43,9 @@ export async function handleIncomingTextMessage(message: TelegramMessageData) {
     return Response.json({ ok: false }, { status: 500 });
   }
 
-  await sendTelegramMessage(message.chatId, "Спасибо! Ваше сообщение получено.");
+  if (shouldSendAutoReply) {
+    await sendTelegramMessage(message.chatId, "Спасибо! Ваше сообщение получено.");
+  }
 
   return Response.json({ ok: true });
 }

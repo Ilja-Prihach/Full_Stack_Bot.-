@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { ChatPreview, Message } from "../dashboard-shared";
 import { formatTime, getDisplayName, getUsernameLabel } from "../dashboard-shared";
@@ -13,13 +13,22 @@ type MessagePanelProps = {
 
 export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
   const router = useRouter();
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [isSending, startSending] = useTransition();
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  useEffect(() => {
+    const container = messagesContainerRef.current;
 
+    if (!container) {
+      return;
+    }
+
+    container.scrollTop = container.scrollHeight;
+  }, [messages, selectedChat?.clientId]);
+
+  function sendMessage() {
     if (!selectedChat || !draft.trim()) {
       return;
     }
@@ -49,6 +58,20 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
     });
   }
 
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    sendMessage();
+  }
+
+  function handleDraftKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== "Enter" || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    sendMessage();
+  }
+
   return (
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
@@ -68,7 +91,10 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
           <div className={`${styles.muted} text-sm`}>{messages.length} сообщений</div>
         </div>
 
-        <div className="message-scrollbar min-w-0 overflow-x-hidden p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
+        <div
+          ref={messagesContainerRef}
+          className="message-scrollbar min-w-0 overflow-x-hidden p-3 sm:p-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto"
+        >
           <div className="grid min-w-0 gap-3">
             {messages.length === 0 ? (
               <div
@@ -138,6 +164,7 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleDraftKeyDown}
               placeholder={
                 selectedChat
                   ? `Ответить клиенту ${selectedChat.title}`
