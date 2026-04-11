@@ -65,6 +65,7 @@ export default async function Home() {
       errorMessage={messagesError?.message ?? null}
       currentManager={currentManager}
       managers={managers}
+      realtimeAccessToken={accessToken}
     />
   );
 }

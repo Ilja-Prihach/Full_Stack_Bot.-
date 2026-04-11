@@ -15,6 +15,7 @@ export function AdminDashboard({
   errorMessage,
   currentManager = null,
   managers = [],
+  realtimeAccessToken,
 }: AdminDashboardProps) {
   const router = useRouter();
   const [isRefreshing, startRefresh] = useTransition();
@@ -93,29 +94,45 @@ export function AdminDashboard({
   }, [theme]);
 
   useEffect(() => {
+    let isActive = true;
     const supabase = getBrowserRealtimeClient();
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
 
-    const channel = supabase
-      .channel("admin-messages-realtime")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-        },
-        () => {
-          startRefresh(() => {
-            router.refresh();
-          });
-        },
-      )
-      .subscribe();
+    async function setupRealtime() {
+      await supabase.realtime.setAuth(realtimeAccessToken);
+
+      if (!isActive) {
+        return;
+      }
+
+      currentChannel = supabase
+        .channel("admin-messages-realtime")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+          },
+          () => {
+            startRefresh(() => {
+              router.refresh();
+            });
+          },
+        )
+        .subscribe();
+    }
+
+    void setupRealtime();
 
     return () => {
-      void supabase.removeChannel(channel);
+      isActive = false;
+
+      if (currentChannel) {
+        void supabase.removeChannel(currentChannel);
+      }
     };
-  }, [router, startRefresh]);
+  }, [router, startRefresh, realtimeAccessToken]);
 
   function handleLogout() {
     startLogout(async () => {

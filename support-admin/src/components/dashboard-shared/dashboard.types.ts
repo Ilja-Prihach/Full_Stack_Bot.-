@@ -38,4 +38,5 @@ export type AdminDashboardProps = {
   errorMessage: string | null;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  realtimeAccessToken: string;
 };
