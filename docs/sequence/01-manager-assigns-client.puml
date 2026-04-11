@@ -1,0 +1,38 @@
+@startuml
+title Менеджер назначает клиента
+
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Менеджер" as manager
+participant "Admin UI" as ui
+participant "Support Admin API" as api
+database "public.clients" as clients
+database "public.client_assignments" as assignments
+database "public.managers" as managers
+
+manager -> ui : Открывает чат клиента
+ui -> api : POST /api/clients/{id}/assign\nclientId, targetManagerId
+api -> managers : Проверяет сессию менеджера\nи загружает профиль актёра
+managers --> api : Актёр найден
+api -> clients : Загружает клиента по id
+clients --> api : Клиент найден
+api -> managers : Загружает целевого менеджера по id
+managers --> api : Целевой менеджер найден
+api -> assignments : Ищет назначение по client_id
+
+alt Назначение уже существует
+  assignments --> api : Текущее назначение
+  api -> assignments : Обновляет assigned_manager_id\nprevious_manager_id = старый assigned\nlast_reassigned_by_manager_id = актёр\nupdated_at = now()
+else Первое назначение клиента
+  assignments --> api : Запись отсутствует
+  api -> assignments : Создаёт запись с client_id\nassigned_manager_id = target\nprevious_manager_id = NULL\nlast_reassigned_by_manager_id = актёр\ncreated_at = now()
+end
+
+assignments --> api : Назначение сохранено
+api --> ui : 200 OK с обновлённым назначением
+ui --> manager : Показывает нового ответственного в UI
+
+@enduml

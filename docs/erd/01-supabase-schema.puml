@@ -1,0 +1,115 @@
+@startuml
+title SupportBot Supabase ERD
+
+left to right direction
+hide circle
+
+skinparam shadowing false
+skinparam linetype ortho
+skinparam nodesep 140
+skinparam ranksep 150
+skinparam entity {
+  BackgroundColor white
+  BorderColor black
+}
+
+entity "auth.users" as auth_users {
+  * id : uuid <<PK>>
+  --
+  email : text
+  created_at : timestamptz
+}
+
+entity "public.messages" as messages {
+  * id : bigint <<PK>>
+  --
+  client_id : bigint <<FK>>
+  * text : text
+  * created_at : timestamptz = now()
+}
+
+entity "public.managers" as managers {
+  * id : bigint <<PK>>
+  --
+  * auth_user_id : uuid <<FK>>
+  * first_name : varchar(255)
+  * last_name : varchar(255)
+  * position : varchar(255)
+  * created_at : timestamptz = now()
+}
+
+entity "public.clients" as clients {
+  * id : bigint <<PK>>
+  --
+  * telegram_user_id : bigint <<UNIQUE>>
+  * telegram_chat_id : bigint <<UNIQUE>>
+  username : varchar(32)
+  first_name : varchar(64)
+  last_name : varchar(64)
+  * created_at : timestamptz = now()
+}
+
+entity "public.client_assignments" as client_assignments {
+  * id : bigint <<PK>>
+  --
+  * client_id : bigint <<FK, UNIQUE>>
+  assigned_manager_id : bigint <<FK>>
+  previous_manager_id : bigint <<FK>>
+  last_reassigned_by_manager_id : bigint <<FK>>
+  * created_at : timestamptz = now()
+  updated_at : timestamptz
+}
+
+' Layout guides for readable spacing.
+auth_users -[hidden]down- managers
+managers -[hidden]right- clients
+clients -[hidden]right- client_assignments
+client_assignments -[hidden]down- messages
+
+auth_users ||--o{ managers : "auth user"
+clients ||--|| client_assignments : "assignment"
+managers ||--o{ client_assignments : "current manager"
+managers ||--o{ client_assignments : "previous manager"
+managers ||--o{ client_assignments : "reassigned by"
+clients ||--o{ messages : "messages"
+
+note right of messages
+  Current table exists in migrations,
+  but this diagram reflects the
+  target normalized model.
+
+  Messages belong to one client.
+  Text is stored here, not in clients.
+
+  RLS is already enabled on the
+  current messages table.
+end note
+
+note right of managers
+  Planned table.
+
+  Not created in migrations yet.
+  Intended for admin identities
+  mapped to Supabase Auth users.
+end note
+
+note right of clients
+  Planned table.
+
+  Stores unique client identity
+  for chat list and CRM-style UI.
+  Intended parent for messages.
+end note
+
+note right of client_assignments
+  Planned table.
+
+  One row per client.
+  Stores current assignee,
+  previous assignee and
+  who made the last reassignment.
+
+  Manager fields may be NULL.
+end note
+
+@enduml
