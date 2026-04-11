@@ -3,6 +3,8 @@ title SupportBot - Container Diagram
 
 left to right direction
 skinparam shadowing false
+skinparam nodesep 90
+skinparam ranksep 100
 skinparam packageStyle rectangle
 skinparam linetype ortho
 skinparam defaultTextAlignment center
@@ -35,17 +37,26 @@ package "SupportBot Containers" as SupportBot {
   }
 }
 
+SupportManager -[hidden]-> Browser
+Browser -[hidden]-> NextPage
+NextPage -[hidden]-> AdminSupabaseClient
+AdminSupabaseClient -[hidden]-> MessagesDb
+TelegramUser -[hidden]-> TelegramApi
+TelegramApi -[hidden]-> Webhook
+Webhook -[hidden]-> MessagesDb
+NextPage -[hidden]-> DashboardUi
+
 SupportManager --> Browser : uses
 Browser --> NextPage : requests admin page
 NextPage --> AdminSupabaseClient : creates query client
-NextPage --> MessagesDb : selects messages
-NextPage --> DashboardUi : passes initialMessages
+NextPage --> MessagesDb : selects\nmessages
+NextPage --> DashboardUi : passes\ninitialMessages
 
 TelegramUser --> TelegramApi : sends message
-TelegramApi --> Webhook : POST update payload
+TelegramApi --> Webhook : POST update\npayload
 Webhook --> MessagesDb : inserts inbound message
-Webhook --> TelegramApi : POST sendMessage
+Webhook --> TelegramApi : POST\nsendMessage
 
-AdminSupabaseClient --> MessagesDb : connects with anon key
+AdminSupabaseClient --> MessagesDb : connects with\nanon key
 
 @enduml
