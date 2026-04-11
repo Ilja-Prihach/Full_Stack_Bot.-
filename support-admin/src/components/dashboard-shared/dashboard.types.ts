@@ -24,7 +24,18 @@ export type ChatPreview = {
   totalMessages: number;
 };
 
+export type ManagerProfile = {
+  id: number;
+  auth_user_id: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  position: string;
+};
+
 export type AdminDashboardProps = {
   initialMessages: Message[];
   errorMessage: string | null;
+  currentManager: ManagerProfile | null;
+  managers: ManagerProfile[];
 };

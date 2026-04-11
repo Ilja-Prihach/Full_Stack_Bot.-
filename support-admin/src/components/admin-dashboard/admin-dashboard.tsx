@@ -12,6 +12,8 @@ import styles from "./admin-dashboard.module.css";
 export function AdminDashboard({
   initialMessages,
   errorMessage,
+  currentManager = null,
+  managers = [],
 }: AdminDashboardProps) {
   const router = useRouter();
   const [isRefreshing, startRefresh] = useTransition();
@@ -89,6 +91,8 @@ export function AdminDashboard({
     <main className="min-h-screen overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:h-screen lg:overflow-hidden lg:px-8 lg:py-4">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 lg:h-full lg:gap-4">
         <DashboardHero
+          currentManager={currentManager}
+          managers={managers}
           totalMessages={initialMessages.length}
           totalChats={chatPreviews.length}
           theme={theme}
