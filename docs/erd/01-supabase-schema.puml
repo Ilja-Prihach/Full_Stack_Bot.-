@@ -23,6 +23,11 @@ entity "auth.users" as auth_users {
 entity "public.messages" as messages {
   * id : bigint <<PK>>
   --
+  chat_id : bigint <<LEGACY>>
+  user_id : bigint <<LEGACY>>
+  username : varchar(255) <<LEGACY>>
+  first_name : varchar(255) <<LEGACY>>
+  last_name : varchar(255) <<LEGACY>>
   client_id : bigint <<FK>>
   * sender_type : text
   sender_manager_id : bigint <<FK>>
@@ -65,7 +70,6 @@ entity "public.client_assignments" as client_assignments {
   updated_at : timestamptz
 }
 
-' Layout guides for readable spacing.
 auth_users -[hidden]down- managers
 managers -[hidden]right- clients
 clients -[hidden]right- client_assignments
@@ -80,43 +84,38 @@ managers ||--o{ messages : "manager sender"
 clients ||--o{ messages : "messages"
 
 note right of messages
-  Current table exists in migrations,
-  but this diagram reflects the
-  target normalized model.
-
   Messages belong to one client.
   Supports both client and
   manager messages.
   Text is stored here, not in clients.
 
+  Legacy source columns
+  chat_id, user_id, username,
+  first_name, last_name still exist
+  for transition compatibility.
+
   RLS is enabled on the
   current messages table.
-  Target access is manager-only.
+  Access is manager-only.
+  Realtime publication is enabled.
 end note
 
 note right of managers
-  Planned table.
-
-  Not created in migrations yet.
-  Intended for admin identities
+  Stores admin identities
   mapped to Supabase Auth users.
   Existing auth users are seeded
   into managers by migration.
-  RLS will allow manager-only access.
+  RLS allows manager-only access.
 end note
 
 note right of clients
-  Planned table.
-
   Stores unique client identity
   for chat list and CRM-style UI.
-  Intended parent for messages.
-  RLS will allow manager-only access.
+  Parent entity for messages.
+  RLS allows manager-only access.
 end note
 
 note right of client_assignments
-  Planned table.
-
   One row per client.
   Stores current assignee,
   previous assignee and
@@ -125,7 +124,7 @@ note right of client_assignments
   snapshot for clearer UI.
 
   Manager fields may be NULL.
-  RLS will allow manager-only access.
+  RLS allows manager-only access.
 end note
 
 @enduml

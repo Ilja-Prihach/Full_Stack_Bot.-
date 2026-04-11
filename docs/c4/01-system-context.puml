@@ -22,11 +22,13 @@ skinparam ActorBackgroundColor #fef3c7
 actor "Telegram User" as TelegramUser
 actor "Support Manager" as SupportManager
 rectangle "Telegram Bot API" as TelegramApi
+rectangle "Supabase Realtime\nWebSocket" as SupabaseRealtime
 
 package "SupportBot" as SupportBot {
   rectangle "support-admin\nNext.js admin dashboard" as SupportAdmin
+  rectangle "admin reply API\n/api/clients/{id}/messages" as ReplyApi
   rectangle "telegram-webhook\nSupabase Edge Function" as TelegramWebhook
-  database "Supabase Postgres\npublic.messages" as MessagesDb
+  database "Supabase Postgres\nmessages, clients,\nmanagers, client_assignments" as MessagesDb
 }
 
 rectangle "Supabase Platform" as SupabasePlatform
@@ -35,18 +37,26 @@ TelegramUser -[hidden]-> TelegramApi
 TelegramApi -[hidden]-> TelegramWebhook
 TelegramWebhook -[hidden]-> MessagesDb
 SupportManager -[hidden]-> SupportAdmin
+SupportAdmin -[hidden]-> ReplyApi
+SupportAdmin -[hidden]-> SupabaseRealtime
 MessagesDb -[hidden]-> SupabasePlatform
 
 TelegramUser --> TelegramApi : sends\nsupport message
 TelegramApi --> TelegramWebhook : forwards\nwebhook update
-TelegramWebhook --> MessagesDb : persists\ninbound message
-TelegramWebhook --> TelegramApi : sends\nacknowledgement
+TelegramWebhook --> MessagesDb : persists inbound\nmessage and client data
+TelegramWebhook --> TelegramApi : sends conditional\nacknowledgement
 
 SupportManager --> SupportAdmin : opens dashboard
-SupportAdmin --> MessagesDb : reads\nmessage history
+SupportManager --> ReplyApi : sends reply\nthrough admin UI
+SupportAdmin --> MessagesDb : reads dialogs\nand manager data
+ReplyApi --> TelegramApi : sends manager\nmessage
+ReplyApi --> MessagesDb : stores outgoing\nmanager message
+MessagesDb --> SupabaseRealtime : emits table\nchange events
+SupabaseRealtime --> SupportAdmin : pushes realtime\nupdates over WebSocket
 
 TelegramWebhook --> SupabasePlatform : deployed on
 MessagesDb --> SupabasePlatform : hosted by
-SupportAdmin --> SupabasePlatform : uses project URL\nand anon key
+SupportAdmin --> SupabasePlatform : uses project URL,\nauth session and realtime
+ReplyApi --> SupabasePlatform : uses project URL\nand manager session
 
 @enduml

@@ -10,7 +10,7 @@ actor "Менеджер" as manager
 participant "Admin UI" as ui
 participant "Support Admin API" as api
 database "public.managers" as managers
-database "public.client_assignments" as assignments
+database "public.clients" as clients
 database "public.messages" as messages
 participant "Telegram Bot API" as telegram
 
@@ -19,13 +19,15 @@ manager -> ui : Вводит текст ответа
 ui -> api : POST /api/clients/{id}/messages\nclientId, text
 api -> managers : Определяет текущего менеджера\nпо auth session
 managers --> api : Текущий менеджер найден
-api -> assignments : Читает текущее назначение клиента
-assignments --> api : Assignment state
-api -> messages : Создаёт сообщение\nclient_id,\nsender_type = manager,\nsender_manager_id = current manager,\nsender_label = "Менеджер",\ntext, created_at = now()
-messages --> api : Сообщение сохранено
+api -> clients : Читает клиента\nid, telegram_chat_id
+clients --> api : Клиент найден
 api -> telegram : Отправляет текст клиенту
 telegram --> api : Сообщение доставлено
+api -> messages : Создаёт сообщение\nclient_id,\nsender_type = manager,\nsender_manager_id = current manager,\nsender_label = "Менеджер",\ntext, created_at = now()
+messages --> api : Сообщение сохранено
 api --> ui : 200 OK with saved message
+ui -> messages : Получает realtime event\nчерез Supabase Realtime
+messages --> ui : Новое сообщение доступно
 ui --> manager : Показывает сообщение в диалоге
 
 @enduml

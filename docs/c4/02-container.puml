@@ -23,17 +23,19 @@ actor "Telegram User" as TelegramUser
 actor "Support Manager" as SupportManager
 rectangle "Telegram Bot API" as TelegramApi
 rectangle "Browser" as Browser
+rectangle "Supabase Realtime\nWebSocket transport" as Realtime
 
 package "SupportBot Containers" as SupportBot {
   package "support-admin" as SupportAdminBoundary {
     rectangle "Next.js page renderer\nsrc/app/page.tsx" as NextPage
     rectangle "Admin dashboard UI\nAdminDashboard + child components" as DashboardUi
-    rectangle "Supabase JS client\nsrc/lib/supabase.ts" as AdminSupabaseClient
+    rectangle "Reply API route\n/api/clients/[clientId]/messages" as ReplyRoute
+    rectangle "Supabase JS clients\nSSR + browser realtime" as AdminSupabaseClient
   }
 
   package "Supabase Project" as SupabaseBoundary {
     rectangle "telegram-webhook\nDeno HTTP function" as Webhook
-    database "Postgres table\npublic.messages" as MessagesDb
+    database "Postgres tables\nmessages, clients,\nmanagers, client_assignments" as MessagesDb
   }
 }
 
@@ -41,6 +43,9 @@ SupportManager -[hidden]-> Browser
 Browser -[hidden]-> NextPage
 NextPage -[hidden]-> AdminSupabaseClient
 AdminSupabaseClient -[hidden]-> MessagesDb
+DashboardUi -[hidden]-> ReplyRoute
+MessagesDb -[hidden]-> Realtime
+Realtime -[hidden]-> Browser
 TelegramUser -[hidden]-> TelegramApi
 TelegramApi -[hidden]-> Webhook
 Webhook -[hidden]-> MessagesDb
@@ -49,14 +54,23 @@ NextPage -[hidden]-> DashboardUi
 SupportManager --> Browser : uses
 Browser --> NextPage : requests admin page
 NextPage --> AdminSupabaseClient : creates query client
-NextPage --> MessagesDb : selects\nmessages
-NextPage --> DashboardUi : passes\ninitialMessages
+NextPage --> MessagesDb : selects messages,\nclients and managers
+NextPage --> DashboardUi : passes initial data\nand auth token
+DashboardUi --> AdminSupabaseClient : subscribes to\nrealtime changes
+AdminSupabaseClient --> Realtime : opens authenticated\nWebSocket subscription
+Realtime --> DashboardUi : notifies about\nmessages changes
 
 TelegramUser --> TelegramApi : sends message
 TelegramApi --> Webhook : POST update\npayload
-Webhook --> MessagesDb : inserts inbound message
-Webhook --> TelegramApi : POST\nsendMessage
+Webhook --> MessagesDb : upserts client and\ninserts inbound message
+Webhook --> TelegramApi : POST sendMessage\nconditional auto-reply
 
-AdminSupabaseClient --> MessagesDb : connects with\nanon key
+SupportManager --> DashboardUi : writes reply
+DashboardUi --> ReplyRoute : POST message text
+ReplyRoute --> TelegramApi : POST sendMessage
+ReplyRoute --> MessagesDb : inserts outgoing\nmanager message
+
+AdminSupabaseClient --> MessagesDb : connects with\nmanager session / anon key
+ReplyRoute --> MessagesDb : connects with\nmanager session
 
 @enduml
