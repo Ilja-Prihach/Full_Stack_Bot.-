@@ -12,6 +12,19 @@
   border-color: var(--line);
 }
 
+.messageBubble {
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.messageBubbleIncoming {
+  background: var(--message-card);
+}
+
+.messageBubbleOutgoing {
+  background: linear-gradient(135deg, rgba(42, 171, 238, 0.14), rgba(26, 140, 206, 0.08));
+}
+
 .messageMeta {
   background: var(--message-meta);
   border-color: var(--line);
@@ -33,6 +46,30 @@
 .badgeMuted {
   background: rgba(88, 113, 132, 0.08);
   color: var(--muted);
+}
+
+.composer {
+  border-color: var(--line);
+  background: var(--card);
+}
+
+.composerInput {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+  resize: vertical;
+}
+
+.composerInput::placeholder {
+  color: var(--muted);
+}
+
+.composerInput:disabled {
+  opacity: 0.72;
+}
+
+.sendButton {
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
 }
 
 .muted {
