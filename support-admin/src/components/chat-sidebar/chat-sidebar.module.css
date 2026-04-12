@@ -50,6 +50,11 @@
   color: var(--accent-deep);
 }
 
+.unreadBadge {
+  background: rgba(42, 171, 238, 0.14);
+  color: var(--accent-deep);
+}
+
 .searchInput {
   background: var(--shell-strong);
   border-color: var(--line);

@@ -16,6 +16,7 @@ export function AdminDashboard({
   currentManager = null,
   managers = [],
   assignments = [],
+  readStates = [],
   realtimeAccessToken,
 }: AdminDashboardProps) {
   const router = useRouter();
@@ -27,7 +28,7 @@ export function AdminDashboard({
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
-  const chatPreviews = getChatPreviews(initialMessages);
+  const chatPreviews = getChatPreviews(initialMessages, readStates);
   const assignmentsByClientId = new Map(
     assignments.map((assignment) => [assignment.client_id, assignment]),
   );
@@ -37,6 +38,7 @@ export function AdminDashboard({
     const assignment = assignmentsByClientId.get(chat.clientId) ?? null;
     const passesAssignmentFilter =
       assignmentFilter === "all" ||
+      (assignmentFilter === "unread" && chat.unreadCount > 0) ||
       (assignmentFilter === "unassigned" && assignment?.assigned_manager_id == null) ||
       (assignmentFilter === "mine" &&
         currentManager != null &&

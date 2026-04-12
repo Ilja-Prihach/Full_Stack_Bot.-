@@ -3,6 +3,7 @@ export type {
   ChatPreview,
   ChatAssignmentFilter,
   ClientAssignment,
+  ClientReadState,
   ManagerProfile,
   Message,
 } from "./dashboard.types";

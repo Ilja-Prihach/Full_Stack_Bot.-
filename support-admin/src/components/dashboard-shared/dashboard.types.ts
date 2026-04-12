@@ -22,6 +22,7 @@ export type ChatPreview = {
   lastMessage: string;
   lastTimestamp: string;
   totalMessages: number;
+  unreadCount: number;
 };
 
 export type ManagerProfile = {
@@ -41,7 +42,19 @@ export type ClientAssignment = {
   last_reassigned_by_manager_name: string | null;
 };
 
-export type ChatAssignmentFilter = "all" | "unassigned" | "mine" | `manager:${number}`;
+export type ClientReadState = {
+  client_id: number;
+  manager_id: number;
+  last_read_message_id: number | null;
+  last_read_at: string | null;
+};
+
+export type ChatAssignmentFilter =
+  | "all"
+  | "unread"
+  | "unassigned"
+  | "mine"
+  | `manager:${number}`;
 
 export type AdminDashboardProps = {
   initialMessages: Message[];
@@ -49,5 +62,6 @@ export type AdminDashboardProps = {
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
   assignments: ClientAssignment[];
+  readStates: ClientReadState[];
   realtimeAccessToken: string;
 };

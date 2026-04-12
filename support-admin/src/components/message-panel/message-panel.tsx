@@ -8,7 +8,7 @@ import type {
   ManagerProfile,
   Message,
 } from "../dashboard-shared";
-import { formatTime, getDisplayName, getUsernameLabel } from "../dashboard-shared";
+import { formatTime } from "../dashboard-shared";
 import styles from "./message-panel.module.css";
 
 type MessagePanelProps = {
@@ -32,6 +32,7 @@ export function MessagePanel({
 }: MessagePanelProps) {
   const router = useRouter();
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const lastReadSyncKeyRef = useRef<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
@@ -55,6 +56,10 @@ export function MessagePanel({
         .filter(Boolean)
         .join(" • ")
     : "Выберите чат слева";
+  const latestClientMessageId =
+    [...messages]
+      .reverse()
+      .find((message) => message.sender_type === "client")?.id ?? null;
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -65,6 +70,42 @@ export function MessagePanel({
 
     container.scrollTop = container.scrollHeight;
   }, [messages, selectedChat?.clientId]);
+
+  useEffect(() => {
+    if (!selectedChat || latestClientMessageId == null) {
+      return;
+    }
+
+    const clientId = selectedChat.clientId;
+    const syncKey = `${clientId}:${latestClientMessageId}`;
+
+    if (lastReadSyncKeyRef.current === syncKey) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function markChatAsRead() {
+      const response = await fetch(`/api/clients/${clientId}/read`, {
+        method: "POST",
+      });
+
+      const payload = (await response.json()) as { ok?: boolean };
+
+      if (cancelled || !response.ok || payload.ok === false) {
+        return;
+      }
+
+      lastReadSyncKeyRef.current = syncKey;
+      router.refresh();
+    }
+
+    void markChatAsRead();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [latestClientMessageId, router, selectedChat]);
 
   function sendMessage() {
     if (!selectedChat || !draft.trim()) {
@@ -234,32 +275,14 @@ export function MessagePanel({
                         isManagerMessage
                           ? styles.messageBubbleOutgoing
                           : styles.messageBubbleIncoming
-                      } max-w-[85%] rounded-[24px] px-4 py-4 sm:max-w-[75%] sm:px-5 sm:py-5`}
+                      } max-w-[88%] rounded-[20px] px-3 py-3 sm:max-w-[72%] sm:px-4 sm:py-3.5`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`${styles.avatar} flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white`}
-                        >
-                          {getDisplayName(message).slice(0, 1).toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold">
-                            {getDisplayName(message)}
-                          </div>
-                          {getUsernameLabel(message) ? (
-                            <div className={`${styles.muted} truncate text-xs`}>
-                              {getUsernameLabel(message)}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[14px] leading-6 sm:text-[15px] sm:leading-7">
+                      <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[13px] leading-5 sm:text-[14px] sm:leading-6">
                         {message.text}
                       </p>
 
-                      <div className="mt-3 flex items-center justify-between gap-3 text-xs">
-                        <span className={`${styles.badgeMuted} rounded-full px-3 py-1`}>
+                      <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
+                        <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5`}>
                           {isManagerMessage ? "Менеджер" : "Клиент"}
                         </span>
                         <span className={styles.muted}>{formatTime(message.created_at)}</span>

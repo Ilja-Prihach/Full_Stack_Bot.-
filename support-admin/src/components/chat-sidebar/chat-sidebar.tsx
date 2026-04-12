@@ -26,6 +26,10 @@ function getFilterLabel(
     return "Все чаты";
   }
 
+  if (filter === "unread") {
+    return "Непрочитанные";
+  }
+
   if (filter === "unassigned") {
     return "Без назначения";
   }
@@ -127,6 +131,15 @@ export function ChatSidebar({
                 </button>
                 <button
                   type="button"
+                  onClick={() => applyAssignmentFilter("unread")}
+                  className={`${styles.filterOption} ${
+                    assignmentFilter === "unread" ? styles.filterOptionActive : ""
+                  } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
+                >
+                  Непрочитанные
+                </button>
+                <button
+                  type="button"
                   onClick={() => applyAssignmentFilter("unassigned")}
                   className={`${styles.filterOption} ${
                     assignmentFilter === "unassigned" ? styles.filterOptionActive : ""
@@ -210,8 +223,12 @@ export function ChatSidebar({
                         <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
                       ) : null}
                     </div>
-                    <div className={`${styles.muted} shrink-0 text-xs`}>
-                      {chat.totalMessages}
+                    <div className="flex shrink-0 items-center">
+                      {chat.unreadCount > 0 ? (
+                        <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                          {chat.unreadCount}
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>

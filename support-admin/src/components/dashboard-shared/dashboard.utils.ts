@@ -1,4 +1,4 @@
-import type { ChatPreview, Message } from "./dashboard.types";
+import type { ChatPreview, ClientReadState, Message } from "./dashboard.types";
 
 export function formatTime(timestamp: string) {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -66,8 +66,9 @@ function getChatIdentity(chatMessages: Message[]) {
   };
 }
 
-export function getChatPreviews(messages: Message[]) {
+export function getChatPreviews(messages: Message[], readStates: ClientReadState[] = []) {
   const byChat = new Map<number, Message[]>();
+  const readStateByClientId = new Map(readStates.map((readState) => [readState.client_id, readState]));
 
   for (const message of messages) {
     const existing = byChat.get(message.client_id) ?? [];
@@ -89,6 +90,19 @@ export function getChatPreviews(messages: Message[]) {
       lastMessage: latestMessage.text,
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,
+      unreadCount: chatMessages.filter((message) => {
+        if (message.sender_type !== "client") {
+          return false;
+        }
+
+        const readState = readStateByClientId.get(clientId);
+
+        if (!readState?.last_read_message_id) {
+          return true;
+        }
+
+        return Number(message.id) > readState.last_read_message_id;
+      }).length,
     });
   }
 

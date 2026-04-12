@@ -34,7 +34,7 @@
 
 .messageBubble {
   border: 1px solid var(--line);
-  box-shadow: var(--shadow);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
 }
 
 .messageBubbleIncoming {
@@ -64,7 +64,7 @@
 }
 
 .badgeMuted {
-  background: rgba(88, 113, 132, 0.08);
+  background: rgba(88, 113, 132, 0.06);
   color: var(--muted);
 }
 

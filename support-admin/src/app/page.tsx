@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components";
-import type { ClientAssignment, ManagerProfile, Message } from "@/components";
+import type { ClientAssignment, ClientReadState, ManagerProfile, Message } from "@/components";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
@@ -24,12 +24,7 @@ export default async function Home() {
   }
 
   const supabase = createAuthenticatedSupabaseClient(accessToken);
-  const [
-    { data: userData },
-    { data: messages, error: messagesError },
-    { data: managersData },
-    { data: assignmentsData },
-  ] =
+  const [{ data: userData }, { data: messages, error: messagesError }, { data: managersData }, { data: assignmentsData }] =
     await Promise.all([
       supabase.auth.getUser(accessToken),
       supabase
@@ -86,6 +81,21 @@ export default async function Home() {
   const assignments = (assignmentsData ?? []) as ClientAssignment[];
   const currentManager =
     managers.find((manager) => manager.auth_user_id === userData.user?.id) ?? null;
+  const readStates = currentManager
+    ? (((
+        await supabase
+          .from("client_read_states")
+          .select(
+            `
+              client_id,
+              manager_id,
+              last_read_message_id,
+              last_read_at
+            `,
+          )
+          .eq("manager_id", currentManager.id)
+      ).data ?? []) as ClientReadState[])
+    : [];
 
   return (
     <AdminDashboard
@@ -94,6 +104,7 @@ export default async function Home() {
       currentManager={currentManager}
       managers={managers}
       assignments={assignments}
+      readStates={readStates}
       realtimeAccessToken={accessToken}
     />
   );
