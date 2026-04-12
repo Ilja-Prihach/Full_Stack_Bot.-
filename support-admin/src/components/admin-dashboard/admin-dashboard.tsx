@@ -15,6 +15,7 @@ export function AdminDashboard({
   errorMessage,
   currentManager = null,
   managers = [],
+  assignments = [],
   realtimeAccessToken,
 }: AdminDashboardProps) {
   const router = useRouter();
@@ -75,6 +76,8 @@ export function AdminDashboard({
   );
 
   const selectedChat = visibleChats.find((chat) => chat.clientId === activeClientId) ?? null;
+  const selectedAssignment =
+    assignments.find((assignment) => assignment.client_id === activeClientId) ?? null;
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("support-admin-theme");
 
@@ -181,7 +184,13 @@ export function AdminDashboard({
                 }}
               />
 
-              <MessagePanel selectedChat={selectedChat} messages={orderedVisibleMessages} />
+              <MessagePanel
+                selectedChat={selectedChat}
+                messages={orderedVisibleMessages}
+                currentManager={currentManager}
+                managers={managers}
+                assignment={selectedAssignment}
+              />
             </div>
           )}
         </section>

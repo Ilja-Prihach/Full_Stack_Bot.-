@@ -33,10 +33,19 @@ export type ManagerProfile = {
   position: string;
 };
 
+export type ClientAssignment = {
+  client_id: number;
+  assigned_manager_id: number | null;
+  previous_manager_id: number | null;
+  last_reassigned_by_manager_id: number | null;
+  last_reassigned_by_manager_name: string | null;
+};
+
 export type AdminDashboardProps = {
   initialMessages: Message[];
   errorMessage: string | null;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  assignments: ClientAssignment[];
   realtimeAccessToken: string;
 };

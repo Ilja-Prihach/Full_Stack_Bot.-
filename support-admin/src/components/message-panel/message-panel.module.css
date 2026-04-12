@@ -7,6 +7,21 @@
   border-color: var(--line);
 }
 
+.assignmentBadge {
+  background: rgba(42, 171, 238, 0.12);
+  color: var(--accent-deep);
+}
+
+.assignmentSelect {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.assignmentSelect:disabled {
+  opacity: 0.72;
+}
+
 .messageCard {
   background: var(--message-card);
   border-color: var(--line);

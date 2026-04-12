@@ -32,11 +32,32 @@ export function getClientDisplayName(message: Message) {
     .filter(Boolean)
     .join(" ");
 
-  return message.client?.username || fullName || "Unknown user";
+  return message.client?.username || fullName || message.sender_label || `Client ${message.client_id}`;
 }
 
 export function getClientUsernameLabel(message: Message) {
-  return message.client?.username ? `@${message.client.username}` : "без username";
+  return message.client?.username
+    ? `@${message.client.username}`
+    : message.client?.telegram_chat_id
+      ? `chat ${message.client.telegram_chat_id}`
+      : "без username";
+}
+
+function getChatIdentity(chatMessages: Message[]) {
+  const candidate =
+    chatMessages.find((message) => {
+      const fullName = [message.client?.first_name, message.client?.last_name]
+        .filter(Boolean)
+        .join(" ");
+
+      return Boolean(message.client?.username || fullName || message.sender_label);
+    }) ?? chatMessages[0];
+
+  return {
+    title: getClientDisplayName(candidate),
+    subtitle: getClientUsernameLabel(candidate),
+    telegramChatId: candidate.client?.telegram_chat_id ?? null,
+  };
 }
 
 export function getChatPreviews(messages: Message[]) {
@@ -52,12 +73,13 @@ export function getChatPreviews(messages: Message[]) {
 
   for (const [clientId, chatMessages] of byChat.entries()) {
     const latestMessage = chatMessages[0];
+    const identity = getChatIdentity(chatMessages);
 
     previews.push({
       clientId,
-      telegramChatId: latestMessage.client?.telegram_chat_id ?? null,
-      title: getClientDisplayName(latestMessage),
-      subtitle: getClientUsernameLabel(latestMessage),
+      telegramChatId: identity.telegramChatId,
+      title: identity.title,
+      subtitle: identity.subtitle,
       lastMessage: latestMessage.text,
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,

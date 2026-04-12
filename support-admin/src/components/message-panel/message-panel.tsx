@@ -2,21 +2,50 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { ChatPreview, Message } from "../dashboard-shared";
+import type {
+  ChatPreview,
+  ClientAssignment,
+  ManagerProfile,
+  Message,
+} from "../dashboard-shared";
 import { formatTime, getDisplayName, getUsernameLabel } from "../dashboard-shared";
 import styles from "./message-panel.module.css";
 
 type MessagePanelProps = {
   selectedChat: ChatPreview | null;
   messages: Message[];
+  currentManager: ManagerProfile | null;
+  managers: ManagerProfile[];
+  assignment: ClientAssignment | null;
 };
 
-export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
+function formatManagerName(manager: ManagerProfile) {
+  return `${manager.first_name} ${manager.last_name}`.trim();
+}
+
+export function MessagePanel({
+  selectedChat,
+  messages,
+  currentManager,
+  managers,
+  assignment,
+}: MessagePanelProps) {
   const router = useRouter();
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [isSending, startSending] = useTransition();
+  const [isAssigning, startAssigning] = useTransition();
+
+  const assignedManager =
+    assignment?.assigned_manager_id != null
+      ? managers.find((manager) => manager.id === assignment.assigned_manager_id) ?? null
+      : null;
+  const lastReassignedByManager =
+    assignment?.last_reassigned_by_manager_id != null
+      ? managers.find((manager) => manager.id === assignment.last_reassigned_by_manager_id) ?? null
+      : null;
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -72,6 +101,37 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
     sendMessage();
   }
 
+  function handleAssignmentChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextManagerId = event.target.value;
+
+    if (!selectedChat) {
+      return;
+    }
+
+    setAssignmentError(null);
+
+    startAssigning(async () => {
+      const response = await fetch(`/api/clients/${selectedChat.clientId}/assignment`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          managerId: nextManagerId ? Number(nextManagerId) : null,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || payload.ok === false) {
+        setAssignmentError(payload.error ?? "Не удалось сохранить назначение");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
@@ -88,7 +148,49 @@ export function MessagePanel({ selectedChat, messages }: MessagePanelProps) {
                 : "Выберите чат слева"}
             </div>
           </div>
-          <div className={`${styles.muted} text-sm`}>{messages.length} сообщений</div>
+          <div className="min-w-[260px] space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className={`${styles.muted} text-sm`}>{messages.length} сообщений</div>
+              <span className={`${styles.assignmentBadge} rounded-full px-3 py-1 text-xs font-medium`}>
+                {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-2 sm:items-end">
+              <label className="flex w-full flex-col gap-1 sm:max-w-[280px]">
+                <span className={`${styles.muted} text-xs font-medium uppercase tracking-[0.08em]`}>
+                  Назначенный менеджер
+                </span>
+                <select
+                  value={assignment?.assigned_manager_id != null ? String(assignment.assigned_manager_id) : ""}
+                  onChange={handleAssignmentChange}
+                  disabled={!selectedChat || !currentManager || isAssigning}
+                  className={`${styles.assignmentSelect} rounded-2xl px-4 py-2.5 text-sm outline-none`}
+                >
+                  <option value="">Без назначения</option>
+                  {managers.map((manager) => (
+                    <option key={manager.id} value={manager.id}>
+                      {formatManagerName(manager)} · {manager.position}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className={`${styles.muted} min-h-[20px] text-right text-xs`}>
+                {assignmentError
+                  ? assignmentError
+                  : assignment?.last_reassigned_by_manager_name ||
+                      (lastReassignedByManager ? formatManagerName(lastReassignedByManager) : null)
+                    ? `Последнее назначение: ${
+                        assignment?.last_reassigned_by_manager_name ??
+                        (lastReassignedByManager ? formatManagerName(lastReassignedByManager) : "")
+                      }`
+                    : assignedManager
+                      ? `Текущий ответственный: ${formatManagerName(assignedManager)}`
+                      : "Клиент пока не назначен"}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div

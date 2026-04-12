@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components";
-import type { ManagerProfile, Message } from "@/components";
+import type { ClientAssignment, ManagerProfile, Message } from "@/components";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
@@ -24,7 +24,12 @@ export default async function Home() {
   }
 
   const supabase = createAuthenticatedSupabaseClient(accessToken);
-  const [{ data: userData }, { data: messages, error: messagesError }, { data: managersData }] =
+  const [
+    { data: userData },
+    { data: messages, error: messagesError },
+    { data: managersData },
+    { data: assignmentsData },
+  ] =
     await Promise.all([
       supabase.auth.getUser(accessToken),
       supabase
@@ -60,6 +65,17 @@ export default async function Home() {
           `,
         )
         .order("first_name", { ascending: true }),
+      supabase
+        .from("client_assignments")
+        .select(
+          `
+            client_id,
+            assigned_manager_id,
+            previous_manager_id,
+            last_reassigned_by_manager_id,
+            last_reassigned_by_manager_name
+          `,
+        ),
     ]);
 
   const typedMessages: Message[] = ((messages ?? []) as RawMessage[]).map((message) => ({
@@ -67,6 +83,7 @@ export default async function Home() {
     client: message.client[0] ?? null,
   }));
   const managers = (managersData ?? []) as ManagerProfile[];
+  const assignments = (assignmentsData ?? []) as ClientAssignment[];
   const currentManager =
     managers.find((manager) => manager.auth_user_id === userData.user?.id) ?? null;
 
@@ -76,6 +93,7 @@ export default async function Home() {
       errorMessage={messagesError?.message ?? null}
       currentManager={currentManager}
       managers={managers}
+      assignments={assignments}
       realtimeAccessToken={accessToken}
     />
   );
