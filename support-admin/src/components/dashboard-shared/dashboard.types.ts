@@ -41,6 +41,8 @@ export type ClientAssignment = {
   last_reassigned_by_manager_name: string | null;
 };
 
+export type ChatAssignmentFilter = "all" | "unassigned" | "mine" | `manager:${number}`;
+
 export type AdminDashboardProps = {
   initialMessages: Message[];
   errorMessage: string | null;

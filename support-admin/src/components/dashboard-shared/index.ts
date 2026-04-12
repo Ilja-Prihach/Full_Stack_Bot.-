@@ -1,6 +1,7 @@
 export type {
   AdminDashboardProps,
   ChatPreview,
+  ChatAssignmentFilter,
   ClientAssignment,
   ManagerProfile,
   Message,

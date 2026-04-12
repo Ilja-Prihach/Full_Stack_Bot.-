@@ -8,6 +8,7 @@ export { MessagePanel } from "./message-panel";
 export type {
   AdminDashboardProps,
   ChatPreview,
+  ChatAssignmentFilter,
   ClientAssignment,
   ManagerProfile,
   Message,
