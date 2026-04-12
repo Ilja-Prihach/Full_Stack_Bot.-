@@ -86,41 +86,40 @@ export function DashboardHero({
 
   return (
     <section
-      className={`${styles.heroSection} rounded-[28px] border px-4 py-5 shadow-[var(--shadow)] sm:px-6 sm:py-6 lg:rounded-[32px] lg:px-8`}
+      className={`${styles.heroSection} rounded-[24px] border px-4 py-4 shadow-[var(--shadow)] sm:px-5 sm:py-4 lg:rounded-[28px] lg:px-6`}
     >
-      <div className="flex flex-col gap-3 text-white sm:gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-2xl">
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:mt-3 sm:text-3xl lg:text-4xl">
+      <div className="flex flex-col gap-3 text-white lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-col gap-2">
+          <h1 className="text-xl font-semibold tracking-tight sm:text-2xl lg:text-[1.9rem]">
             SupportBot — Сообщения
           </h1>
+          <div className={`${styles.statsGrid} flex flex-wrap gap-2 text-xs sm:text-sm`}>
+            <div className={`${styles.statCard} rounded-full px-3 py-1.5`}>
+              <span className="text-white/68">Сообщений</span>
+              <span className="ml-2 font-semibold text-white">{totalMessages}</span>
+            </div>
+            <div className={`${styles.statCard} rounded-full px-3 py-1.5`}>
+              <span className="text-white/68">Чатов</span>
+              <span className="ml-2 font-semibold text-white">{totalChats}</span>
+            </div>
+          </div>
         </div>
 
-        <div className={`${styles.statsGrid} grid grid-cols-2 gap-2 text-sm sm:gap-3`}>
-          <div className={`${styles.statCard} min-w-0 rounded-2xl p-3 sm:p-4`}>
-            <div className="text-white/68">Всего сообщений</div>
-            <div className="mt-2 text-xl font-semibold sm:text-2xl">{totalMessages}</div>
-          </div>
-          <div className={`${styles.statCard} min-w-0 rounded-2xl p-3 sm:p-4`}>
-            <div className="text-white/68">Чатов</div>
-            <div className="mt-2 text-xl font-semibold sm:text-2xl">{totalChats}</div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-end gap-2 lg:self-start">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <details ref={managerMenuRef} className={`${styles.managerMenu} min-w-0`}>
             <summary
-              className={`${styles.managerSummary} flex list-none items-center gap-3 rounded-full px-4 py-2 text-left text-white transition`}
+              className={`${styles.managerSummary} flex list-none items-center gap-2 rounded-full px-3 py-1.5 text-left text-white transition`}
             >
-              <span className={`${styles.managerAvatar} flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-semibold`}>
+              <span className={`${styles.managerAvatar} flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold`}>
                 {currentManager
                   ? `${currentManager.first_name[0] ?? ""}${currentManager.last_name[0] ?? ""}`.trim() || "M"
                   : "?"}
               </span>
               <span className="min-w-0">
-                <span className="block truncate text-sm font-medium">
+                <span className="block truncate text-sm font-medium leading-5">
                   {currentManager ? formatManagerName(currentManager) : "Менеджер"}
                 </span>
-                <span className="block truncate text-xs text-white/72">
+                <span className="block truncate text-[11px] leading-4 text-white/72">
                   {currentManager?.position ?? "Профиль не найден"}
                 </span>
               </span>
@@ -185,7 +184,7 @@ export function DashboardHero({
             type="button"
             onClick={onLogout}
             disabled={isLoggingOut}
-            className={`${styles.logoutButton} rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity disabled:cursor-wait disabled:opacity-70`}
+            className={`${styles.logoutButton} rounded-full px-3 py-1.5 text-sm font-medium text-white transition-opacity disabled:cursor-wait disabled:opacity-70`}
           >
             {isLoggingOut ? "Выход..." : "Выйти"}
           </button>
@@ -193,7 +192,7 @@ export function DashboardHero({
           <button
             type="button"
             onClick={onToggleTheme}
-            className={`${styles.themeToggle} flex h-11 w-11 items-center justify-center rounded-full text-white transition sm:h-12 sm:w-12`}
+            className={`${styles.themeToggle} flex h-9 w-9 items-center justify-center rounded-full text-white transition`}
             aria-label={theme === "light" ? "Включить темную тему" : "Включить светлую тему"}
             title={theme === "light" ? "Темная тема" : "Светлая тема"}
           >

@@ -1,4 +1,4 @@
-import type { ChatPreview, Message } from "./dashboard.types";
+import type { ChatPreview, ClientReadState, Message } from "./dashboard.types";
 
 export function formatTime(timestamp: string) {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -24,7 +24,7 @@ export function getUsernameLabel(message: Message) {
     return "менеджер";
   }
 
-  return message.client?.username ? `@${message.client.username}` : "без username";
+  return message.client?.username ? `@${message.client.username}` : "";
 }
 
 export function getClientDisplayName(message: Message) {
@@ -32,15 +32,43 @@ export function getClientDisplayName(message: Message) {
     .filter(Boolean)
     .join(" ");
 
-  return message.client?.username || fullName || "Unknown user";
+  return message.client?.username || fullName || message.sender_label || `Client ${message.client_id}`;
 }
 
 export function getClientUsernameLabel(message: Message) {
-  return message.client?.username ? `@${message.client.username}` : "без username";
+  return message.client?.username
+    ? `@${message.client.username}`
+    : message.client?.telegram_chat_id
+      ? `chat ${message.client.telegram_chat_id}`
+      : "";
 }
 
-export function getChatPreviews(messages: Message[]) {
+function getChatIdentity(chatMessages: Message[]) {
+  const candidate =
+    chatMessages.find((message) => {
+      if (message.sender_type !== "client") {
+        return false;
+      }
+
+      const fullName = [message.client?.first_name, message.client?.last_name]
+        .filter(Boolean)
+        .join(" ");
+
+      return Boolean(message.client?.username || fullName || message.sender_label);
+    }) ??
+    chatMessages.find((message) => message.sender_type === "client") ??
+    chatMessages[0];
+
+  return {
+    title: getClientDisplayName(candidate),
+    subtitle: getClientUsernameLabel(candidate),
+    telegramChatId: candidate.client?.telegram_chat_id ?? null,
+  };
+}
+
+export function getChatPreviews(messages: Message[], readStates: ClientReadState[] = []) {
   const byChat = new Map<number, Message[]>();
+  const readStateByClientId = new Map(readStates.map((readState) => [readState.client_id, readState]));
 
   for (const message of messages) {
     const existing = byChat.get(message.client_id) ?? [];
@@ -52,15 +80,29 @@ export function getChatPreviews(messages: Message[]) {
 
   for (const [clientId, chatMessages] of byChat.entries()) {
     const latestMessage = chatMessages[0];
+    const identity = getChatIdentity(chatMessages);
 
     previews.push({
       clientId,
-      telegramChatId: latestMessage.client?.telegram_chat_id ?? null,
-      title: getClientDisplayName(latestMessage),
-      subtitle: getClientUsernameLabel(latestMessage),
+      telegramChatId: identity.telegramChatId,
+      title: identity.title,
+      subtitle: identity.subtitle,
       lastMessage: latestMessage.text,
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,
+      unreadCount: chatMessages.filter((message) => {
+        if (message.sender_type !== "client") {
+          return false;
+        }
+
+        const readState = readStateByClientId.get(clientId);
+
+        if (!readState?.last_read_message_id) {
+          return true;
+        }
+
+        return Number(message.id) > readState.last_read_message_id;
+      }).length,
     });
   }
 

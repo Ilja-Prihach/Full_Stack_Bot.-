@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { getBrowserRealtimeClient } from "@/lib/supabase";
 import { ChatSidebar } from "../chat-sidebar";
 import { DashboardHero } from "../dashboard-hero";
-import type { AdminDashboardProps } from "../dashboard-shared";
+import type { AdminDashboardProps, ChatAssignmentFilter } from "../dashboard-shared";
 import { getChatPreviews, getDisplayName, getUsernameLabel } from "../dashboard-shared";
 import { MessagePanel } from "../message-panel";
 import styles from "./admin-dashboard.module.css";
@@ -15,20 +15,41 @@ export function AdminDashboard({
   errorMessage,
   currentManager = null,
   managers = [],
+  assignments = [],
+  readStates = [],
   realtimeAccessToken,
 }: AdminDashboardProps) {
   const router = useRouter();
-  const [isRefreshing, startRefresh] = useTransition();
+  const [, startRefresh] = useTransition();
   const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
-  const chatPreviews = getChatPreviews(initialMessages);
+  const chatPreviews = getChatPreviews(initialMessages, readStates);
+  const assignmentsByClientId = new Map(
+    assignments.map((assignment) => [assignment.client_id, assignment]),
+  );
   const activeClientId = selectedClientId ?? chatPreviews[0]?.clientId ?? null;
 
   const visibleChats = chatPreviews.filter((chat) => {
+    const assignment = assignmentsByClientId.get(chat.clientId) ?? null;
+    const passesAssignmentFilter =
+      assignmentFilter === "all" ||
+      (assignmentFilter === "unread" && chat.unreadCount > 0) ||
+      (assignmentFilter === "unassigned" && assignment?.assigned_manager_id == null) ||
+      (assignmentFilter === "mine" &&
+        currentManager != null &&
+        assignment?.assigned_manager_id === currentManager.id) ||
+      (assignmentFilter.startsWith("manager:") &&
+        assignment?.assigned_manager_id === Number(assignmentFilter.split(":")[1]));
+
+    if (!passesAssignmentFilter) {
+      return false;
+    }
+
     if (!normalizedQuery) {
       return true;
     }
@@ -75,6 +96,8 @@ export function AdminDashboard({
   );
 
   const selectedChat = visibleChats.find((chat) => chat.clientId === activeClientId) ?? null;
+  const selectedAssignment =
+    assignments.find((assignment) => assignment.client_id === activeClientId) ?? null;
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("support-admin-theme");
 
@@ -171,17 +194,21 @@ export function AdminDashboard({
                 chats={visibleChats}
                 activeClientId={activeClientId}
                 searchQuery={searchQuery}
-                isRefreshing={isRefreshing}
+                assignmentFilter={assignmentFilter}
+                currentManager={currentManager}
+                managers={managers}
                 onSearchChange={setSearchQuery}
+                onAssignmentFilterChange={setAssignmentFilter}
                 onSelectChat={setSelectedClientId}
-                onRefresh={() => {
-                  startRefresh(() => {
-                    router.refresh();
-                  });
-                }}
               />
 
-              <MessagePanel selectedChat={selectedChat} messages={orderedVisibleMessages} />
+              <MessagePanel
+                selectedChat={selectedChat}
+                messages={orderedVisibleMessages}
+                currentManager={currentManager}
+                managers={managers}
+                assignment={selectedAssignment}
+              />
             </div>
           )}
         </section>

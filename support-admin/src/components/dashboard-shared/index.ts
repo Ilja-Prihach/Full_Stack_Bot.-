@@ -1,4 +1,12 @@
-export type { AdminDashboardProps, ChatPreview, ManagerProfile, Message } from "./dashboard.types";
+export type {
+  AdminDashboardProps,
+  ChatPreview,
+  ChatAssignmentFilter,
+  ClientAssignment,
+  ClientReadState,
+  ManagerProfile,
+  Message,
+} from "./dashboard.types";
 export {
   formatTime,
   getChatPreviews,

@@ -7,8 +7,52 @@
   color: var(--muted);
 }
 
-.refreshButton {
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+.filterMenu {
+  position: relative;
+}
+
+.filterMenu[open] .filterSummary {
+  background: rgba(42, 171, 238, 0.12);
+  border-color: rgba(42, 171, 238, 0.28);
+}
+
+.filterSummary {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.filterSummary::-webkit-details-marker {
+  display: none;
+}
+
+.filterValue {
+  background: rgba(88, 113, 132, 0.08);
+  color: var(--muted);
+}
+
+.filterPopover {
+  border: 1px solid var(--line);
+  background: var(--card);
+}
+
+.filterOption {
+  background: transparent;
+  color: var(--text);
+}
+
+.filterOption:hover {
+  background: rgba(42, 171, 238, 0.08);
+}
+
+.filterOptionActive {
+  background: rgba(42, 171, 238, 0.14);
+  color: var(--accent-deep);
+}
+
+.unreadBadge {
+  background: rgba(42, 171, 238, 0.14);
+  color: var(--accent-deep);
 }
 
 .searchInput {
