@@ -24,7 +24,7 @@ export function getUsernameLabel(message: Message) {
     return "менеджер";
   }
 
-  return message.client?.username ? `@${message.client.username}` : "без username";
+  return message.client?.username ? `@${message.client.username}` : "";
 }
 
 export function getClientDisplayName(message: Message) {
@@ -40,18 +40,24 @@ export function getClientUsernameLabel(message: Message) {
     ? `@${message.client.username}`
     : message.client?.telegram_chat_id
       ? `chat ${message.client.telegram_chat_id}`
-      : "без username";
+      : "";
 }
 
 function getChatIdentity(chatMessages: Message[]) {
   const candidate =
     chatMessages.find((message) => {
+      if (message.sender_type !== "client") {
+        return false;
+      }
+
       const fullName = [message.client?.first_name, message.client?.last_name]
         .filter(Boolean)
         .join(" ");
 
       return Boolean(message.client?.username || fullName || message.sender_label);
-    }) ?? chatMessages[0];
+    }) ??
+    chatMessages.find((message) => message.sender_type === "client") ??
+    chatMessages[0];
 
   return {
     title: getClientDisplayName(candidate),

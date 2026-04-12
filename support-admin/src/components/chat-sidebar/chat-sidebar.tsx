@@ -6,40 +6,26 @@ type ChatSidebarProps = {
   chats: ChatPreview[];
   activeClientId: number | null;
   searchQuery: string;
-  isRefreshing: boolean;
   onSearchChange: (value: string) => void;
   onSelectChat: (clientId: number) => void;
-  onRefresh: () => void;
 };
 
 export function ChatSidebar({
   chats,
   activeClientId,
   searchQuery,
-  isRefreshing,
   onSearchChange,
   onSelectChat,
-  onRefresh,
 }: ChatSidebarProps) {
   return (
     <aside className={`${styles.sidebar} min-w-0 overflow-hidden rounded-[24px] border p-3 sm:p-4 lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col gap-3 lg:h-full lg:min-h-0 lg:gap-0">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-lg font-semibold">Чаты</div>
-            <div className={`${styles.muted} text-sm`}>{chats.length} найдено</div>
-          </div>
-          <button
-            type="button"
-            onClick={onRefresh}
-            className={`${styles.refreshButton} w-full rounded-full px-4 py-2 text-sm font-medium text-white transition-opacity disabled:cursor-wait disabled:opacity-70 sm:w-auto`}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? "Обновление..." : "Обновить"}
-          </button>
+        <div className="flex items-baseline justify-between gap-3">
+          <div className="text-lg font-semibold">Чаты</div>
+          <div className={`${styles.muted} text-sm`}>{chats.length} найдено</div>
         </div>
 
-        <label className="block lg:mt-4">
+        <label className="block lg:mt-3">
           <span className={`${styles.muted} mb-2 block text-sm font-medium`}>Поиск</span>
           <input
             value={searchQuery}
@@ -73,7 +59,9 @@ export function ChatSidebar({
                   <div className="flex min-w-0 items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-semibold">{chat.title}</div>
-                      <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
+                      {chat.subtitle ? (
+                        <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
+                      ) : null}
                     </div>
                     <div className={`${styles.muted} shrink-0 text-xs`}>
                       {chat.totalMessages}

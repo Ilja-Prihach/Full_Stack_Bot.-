@@ -19,7 +19,7 @@ export function AdminDashboard({
   realtimeAccessToken,
 }: AdminDashboardProps) {
   const router = useRouter();
-  const [isRefreshing, startRefresh] = useTransition();
+  const [, startRefresh] = useTransition();
   const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
@@ -174,14 +174,8 @@ export function AdminDashboard({
                 chats={visibleChats}
                 activeClientId={activeClientId}
                 searchQuery={searchQuery}
-                isRefreshing={isRefreshing}
                 onSearchChange={setSearchQuery}
                 onSelectChat={setSelectedClientId}
-                onRefresh={() => {
-                  startRefresh(() => {
-                    router.refresh();
-                  });
-                }}
               />
 
               <MessagePanel

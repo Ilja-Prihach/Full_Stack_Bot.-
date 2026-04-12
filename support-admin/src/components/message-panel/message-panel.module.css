@@ -7,6 +7,11 @@
   border-color: var(--line);
 }
 
+.messageCount {
+  background: rgba(88, 113, 132, 0.08);
+  color: var(--muted);
+}
+
 .assignmentBadge {
   background: rgba(42, 171, 238, 0.12);
   color: var(--accent-deep);

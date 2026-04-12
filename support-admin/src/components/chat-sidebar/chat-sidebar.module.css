@@ -7,10 +7,6 @@
   color: var(--muted);
 }
 
-.refreshButton {
-  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
-}
-
 .searchInput {
   background: var(--shell-strong);
   border-color: var(--line);

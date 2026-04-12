@@ -46,6 +46,15 @@ export function MessagePanel({
     assignment?.last_reassigned_by_manager_id != null
       ? managers.find((manager) => manager.id === assignment.last_reassigned_by_manager_id) ?? null
       : null;
+  const selectedChatMeta = selectedChat
+    ? [
+        selectedChat.subtitle || null,
+        `Client ID ${selectedChat.clientId}`,
+        selectedChat.telegramChatId ? `Telegram ${selectedChat.telegramChatId}` : null,
+      ]
+        .filter(Boolean)
+        .join(" • ")
+    : "Выберите чат слева";
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -136,36 +145,39 @@ export function MessagePanel({
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
         <div
-          className={`${styles.panelHeader} flex flex-col gap-2 border-b px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5`}
+          className={`${styles.panelHeader} flex flex-col gap-2 border-b px-4 py-3 sm:px-5`}
         >
-          <div className="min-w-0">
-            <div className="truncate text-lg font-semibold sm:text-xl">
-              {selectedChat?.title ?? "Сообщения"}
-            </div>
-            <div className={`${styles.muted} truncate text-sm`}>
-              {selectedChat
-                ? `${selectedChat.subtitle} • Client ID ${selectedChat.clientId}${selectedChat.telegramChatId ? ` • Telegram ${selectedChat.telegramChatId}` : ""}`
-                : "Выберите чат слева"}
-            </div>
-          </div>
-          <div className="min-w-[260px] space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <div className={`${styles.muted} text-sm`}>{messages.length} сообщений</div>
-              <span className={`${styles.assignmentBadge} rounded-full px-3 py-1 text-xs font-medium`}>
-                {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
-              </span>
+          <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <div className="truncate text-base font-semibold sm:text-lg">
+                  {selectedChat?.title ?? "Сообщения"}
+                </div>
+                <span className={`${styles.messageCount} shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium`}>
+                  Всего сообщений {messages.length}
+                </span>
+              </div>
+              <div className={`${styles.muted} truncate text-xs sm:text-sm`}>
+                {selectedChatMeta}
+              </div>
             </div>
 
-            <div className="flex flex-col gap-2 sm:items-end">
-              <label className="flex w-full flex-col gap-1 sm:max-w-[280px]">
-                <span className={`${styles.muted} text-xs font-medium uppercase tracking-[0.08em]`}>
-                  Назначенный менеджер
+            <div className="min-w-0 space-y-1 lg:w-[280px]">
+              <div className="flex items-center justify-between gap-3">
+                <span className={`${styles.muted} text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                  Ответственный
                 </span>
+                <span className={`${styles.assignmentBadge} rounded-full px-2.5 py-1 text-[11px] font-medium`}>
+                  {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
+                </span>
+              </div>
+
+              <label className="block">
                 <select
                   value={assignment?.assigned_manager_id != null ? String(assignment.assigned_manager_id) : ""}
                   onChange={handleAssignmentChange}
                   disabled={!selectedChat || !currentManager || isAssigning}
-                  className={`${styles.assignmentSelect} rounded-2xl px-4 py-2.5 text-sm outline-none`}
+                  className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
                 >
                   <option value="">Без назначения</option>
                   {managers.map((manager) => (
@@ -176,18 +188,18 @@ export function MessagePanel({
                 </select>
               </label>
 
-              <div className={`${styles.muted} min-h-[20px] text-right text-xs`}>
+              <div className={`${styles.muted} min-h-[16px] truncate text-right text-[11px]`}>
                 {assignmentError
                   ? assignmentError
                   : assignment?.last_reassigned_by_manager_name ||
                       (lastReassignedByManager ? formatManagerName(lastReassignedByManager) : null)
-                    ? `Последнее назначение: ${
+                    ? `Последнее изменение: ${
                         assignment?.last_reassigned_by_manager_name ??
                         (lastReassignedByManager ? formatManagerName(lastReassignedByManager) : "")
                       }`
                     : assignedManager
-                      ? `Текущий ответственный: ${formatManagerName(assignedManager)}`
-                      : "Клиент пока не назначен"}
+                      ? `Текущий: ${formatManagerName(assignedManager)}`
+                      : "Назначение не задано"}
               </div>
             </div>
           </div>
@@ -234,9 +246,11 @@ export function MessagePanel({
                           <div className="truncate text-sm font-semibold">
                             {getDisplayName(message)}
                           </div>
-                          <div className={`${styles.muted} truncate text-xs`}>
-                            {getUsernameLabel(message)}
-                          </div>
+                          {getUsernameLabel(message) ? (
+                            <div className={`${styles.muted} truncate text-xs`}>
+                              {getUsernameLabel(message)}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
 
