@@ -62,7 +62,7 @@ export function ChatSidebar({
   currentManager,
   managers,
   isTeamChatActive,
-  teamMessages,
+  teamMessages = [],
   teamReadState,
   onSearchChange,
   onAssignmentFilterChange,
