@@ -127,6 +127,9 @@ export function DashboardHero({
                   {currentManager?.position ?? "Профиль не найден"}
                 </span>
               </span>
+              <svg viewBox="0 0 20 20" fill="currentColor" className="ml-1 h-4 w-4 shrink-0 text-white/50">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
             </summary>
 
             <div className={`${styles.managerPopover} absolute right-0 top-[calc(100%+0.75rem)] z-20 w-[min(24rem,calc(100vw-2rem))] rounded-[24px] p-4 text-slate-900 shadow-2xl`}>
