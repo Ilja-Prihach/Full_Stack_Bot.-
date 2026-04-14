@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ChatAssignmentFilter, ChatPreview, ManagerProfile } from "../dashboard-shared";
+import type { ChatAssignmentFilter, ChatPreview, ManagerProfile, TeamMessage, TeamReadState } from "../dashboard-shared";
 import { formatTime } from "../dashboard-shared";
 import styles from "./chat-sidebar.module.css";
 
@@ -12,9 +12,13 @@ type ChatSidebarProps = {
   assignmentFilter: ChatAssignmentFilter;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  isTeamChatActive: boolean;
+  teamMessages: TeamMessage[];
+  teamReadState: TeamReadState | null;
   onSearchChange: (value: string) => void;
   onAssignmentFilterChange: (filter: ChatAssignmentFilter) => void;
   onSelectChat: (clientId: number) => void;
+  onSelectTeamChat: () => void;
 };
 
 function getFilterLabel(
@@ -57,9 +61,13 @@ export function ChatSidebar({
   assignmentFilter,
   currentManager,
   managers,
+  isTeamChatActive,
+  teamMessages,
+  teamReadState,
   onSearchChange,
   onAssignmentFilterChange,
   onSelectChat,
+  onSelectTeamChat,
 }: ChatSidebarProps) {
   const filterMenuRef = useRef<HTMLDetailsElement | null>(null);
 
@@ -198,6 +206,29 @@ export function ChatSidebar({
         <div
           className={`${styles.chatList} message-scrollbar min-w-0 overflow-x-hidden overflow-y-auto grid auto-rows-max content-start gap-2 pr-1 lg:mt-4 lg:min-h-0 lg:flex-1`}
         >
+          <button
+            type="button"
+            onClick={onSelectTeamChat}
+            className={`${styles.chatButton} ${isTeamChatActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+          >
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="truncate font-semibold">Чат команды</div>
+              {(() => {
+                const lastReadId = teamReadState?.last_read_message_id ?? 0;
+                const unreadCount = teamMessages.filter((m) => m.id > lastReadId).length;
+                return unreadCount > 0 ? (
+                  <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                    {unreadCount}
+                  </span>
+                ) : null;
+              })()}
+            </div>
+            {teamMessages.length > 0 && (
+              <div className="mt-2 truncate text-sm">
+                {teamMessages[teamMessages.length - 1].sender_name}: {teamMessages[teamMessages.length - 1].text}
+              </div>
+            )}
+          </button>
           {chats.length === 0 ? (
             <div
               className={`${styles.muted} rounded-2xl border px-4 py-5 text-sm`}
