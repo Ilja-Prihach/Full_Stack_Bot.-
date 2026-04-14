@@ -56,8 +56,23 @@ export type ChatAssignmentFilter =
   | "mine"
   | `manager:${number}`;
 
+export type TeamMessage = {
+  id: number;
+  sender_id: number;
+  sender_name: string;
+  text: string;
+  created_at: string;
+};
+
+export type TeamReadState = {
+  manager_id: number;
+  last_read_message_id: number | null;
+};
+
 export type AdminDashboardProps = {
   initialMessages: Message[];
+  teamMessages: TeamMessage[];
+  teamReadState: TeamReadState | null;
   errorMessage: string | null;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];

@@ -20,26 +20,10 @@ entity "auth.users" as auth_users {
   created_at : timestamptz
 }
 
-entity "public.messages" as messages {
-  * id : bigint <<PK>>
-  --
-  chat_id : bigint <<LEGACY>>
-  user_id : bigint <<LEGACY>>
-  username : varchar(255) <<LEGACY>>
-  first_name : varchar(255) <<LEGACY>>
-  last_name : varchar(255) <<LEGACY>>
-  client_id : bigint <<FK>>
-  * sender_type : text
-  sender_manager_id : bigint <<FK>>
-  * sender_label : varchar(255)
-  * text : text
-  * created_at : timestamptz = now()
-}
-
 entity "public.managers" as managers {
   * id : bigint <<PK>>
   --
-  * auth_user_id : uuid <<FK>>
+  * auth_user_id : uuid <<FK, UNIQUE>>
   * email : text <<UNIQUE>>
   * first_name : varchar(255)
   * last_name : varchar(255)
@@ -70,61 +54,88 @@ entity "public.client_assignments" as client_assignments {
   updated_at : timestamptz
 }
 
-auth_users -[hidden]down- managers
-managers -[hidden]right- clients
-clients -[hidden]right- client_assignments
-client_assignments -[hidden]down- messages
+entity "public.messages" as messages {
+  * id : bigint <<PK>>
+  --
+  chat_id : bigint <<LEGACY>>
+  user_id : bigint <<LEGACY>>
+  username : varchar(255) <<LEGACY>>
+  first_name : varchar(255) <<LEGACY>>
+  last_name : varchar(255) <<LEGACY>>
+  * client_id : bigint <<FK>>
+  * sender_type : text
+  sender_manager_id : bigint <<FK>>
+  * sender_label : varchar(255)
+  * text : text
+  * created_at : timestamptz = now()
+}
+
+entity "public.client_read_states" as client_read_states {
+  * id : bigint <<PK>>
+  --
+  * client_id : bigint <<FK>>
+  * manager_id : bigint <<FK>>
+  last_read_message_id : bigint <<FK>>
+  last_read_at : timestamptz
+  * created_at : timestamptz = now()
+  * updated_at : timestamptz = now()
+  <<UNIQUE (client_id, manager_id)>>
+}
+
+entity "public.team_messages" as team_messages {
+  * id : bigint <<PK>>
+  --
+  * sender_id : bigint <<FK>>
+  * text : text
+  * created_at : timestamptz = now()
+}
+
+entity "public.team_read_states" as team_read_states {
+  * id : bigint <<PK>>
+  --
+  * manager_id : bigint <<FK, UNIQUE>>
+  last_read_message_id : bigint <<FK>>
+  * updated_at : timestamptz = now()
+}
 
 auth_users ||--o{ managers : "auth user"
 clients ||--|| client_assignments : "assignment"
+clients ||--o{ messages : "messages"
+clients ||--o{ client_read_states : "read states"
 managers ||--o{ client_assignments : "current manager"
 managers ||--o{ client_assignments : "previous manager"
 managers ||--o{ client_assignments : "reassigned by"
 managers ||--o{ messages : "manager sender"
-clients ||--o{ messages : "messages"
+managers ||--o{ client_read_states : "read by manager"
+managers ||--o{ team_messages : "sender"
+managers ||--o{ team_read_states : "read state"
 
 note right of messages
-  Messages belong to one client.
+  Client support messages.
   Supports both client and
-  manager messages.
-  Text is stored here, not in clients.
-
-  Legacy source columns
-  chat_id, user_id, username,
-  first_name, last_name still exist
-  for transition compatibility.
-
-  RLS is enabled on the
-  current messages table.
-  Access is manager-only.
-  Realtime publication is enabled.
+  manager messages via sender_type.
+  Legacy columns kept for transition.
+  RLS enabled, manager-only access.
+  Realtime publication enabled.
 end note
 
-note right of managers
-  Stores admin identities
-  mapped to Supabase Auth users.
-  Existing auth users are seeded
-  into managers by migration.
-  RLS allows manager-only access.
+note right of team_messages
+  Internal team chat between
+  all managers. No client linkage.
+  RLS enabled, manager-only access.
+  Realtime publication enabled.
 end note
 
-note right of clients
-  Stores unique client identity
-  for chat list and CRM-style UI.
-  Parent entity for messages.
-  RLS allows manager-only access.
+note right of client_read_states
+  Tracks last read message
+  per client per manager.
+  Used for unread counts in sidebar.
 end note
 
-note right of client_assignments
-  One row per client.
-  Stores current assignee,
-  previous assignee and
-  who made the last reassignment.
-  Keeps optional manager name
-  snapshot for clearer UI.
-
-  Manager fields may be NULL.
-  RLS allows manager-only access.
+note right of team_read_states
+  Tracks last read team message
+  per manager.
+  One row per manager.
 end note
 
 @enduml

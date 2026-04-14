@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ChatAssignmentFilter, ChatPreview, ManagerProfile } from "../dashboard-shared";
+import type { ChatAssignmentFilter, ChatPreview, ManagerProfile, TeamMessage, TeamReadState } from "../dashboard-shared";
 import { formatTime } from "../dashboard-shared";
 import styles from "./chat-sidebar.module.css";
 
@@ -12,9 +12,14 @@ type ChatSidebarProps = {
   assignmentFilter: ChatAssignmentFilter;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  onlineManagers: Map<number, string>;
+  isTeamChatActive: boolean;
+  teamMessages: TeamMessage[];
+  teamReadState: TeamReadState | null;
   onSearchChange: (value: string) => void;
   onAssignmentFilterChange: (filter: ChatAssignmentFilter) => void;
   onSelectChat: (clientId: number) => void;
+  onSelectTeamChat: () => void;
 };
 
 function getFilterLabel(
@@ -57,9 +62,14 @@ export function ChatSidebar({
   assignmentFilter,
   currentManager,
   managers,
+  onlineManagers,
+  isTeamChatActive,
+  teamMessages = [],
+  teamReadState,
   onSearchChange,
   onAssignmentFilterChange,
   onSelectChat,
+  onSelectTeamChat,
 }: ChatSidebarProps) {
   const filterMenuRef = useRef<HTMLDetailsElement | null>(null);
 
@@ -198,52 +208,167 @@ export function ChatSidebar({
         <div
           className={`${styles.chatList} message-scrollbar min-w-0 overflow-x-hidden overflow-y-auto grid auto-rows-max content-start gap-2 pr-1 lg:mt-4 lg:min-h-0 lg:flex-1`}
         >
-          {chats.length === 0 ? (
-            <div
-              className={`${styles.muted} rounded-2xl border px-4 py-5 text-sm`}
-              style={{ borderColor: "var(--line)" }}
-            >
-              Ничего не найдено по текущему запросу.
+          <button
+            type="button"
+            onClick={onSelectTeamChat}
+            className={`${styles.chatButton} ${isTeamChatActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+          >
+            <div className="flex min-w-0 items-center justify-between gap-3">
+              <div className="truncate font-semibold">Чат команды</div>
+              {(() => {
+                const lastReadId = teamReadState?.last_read_message_id ?? 0;
+                const unreadCount = teamMessages.filter((m) => m.id > lastReadId).length;
+                return unreadCount > 0 ? (
+                  <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                    {unreadCount}
+                  </span>
+                ) : null;
+              })()}
             </div>
-          ) : (
-            chats.map((chat) => {
-              const isActive = chat.clientId === activeClientId;
+            {teamMessages.length > 0 && (
+              <div className="mt-2 truncate text-sm">
+                {teamMessages[teamMessages.length - 1].sender_name}: {teamMessages[teamMessages.length - 1].text}
+              </div>
+            )}
+          </button>
 
-              return (
-                <button
-                  key={chat.clientId}
-                  type="button"
-                  onClick={() => onSelectChat(chat.clientId)}
-                  className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
-                >
-                  <div className="flex min-w-0 items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{chat.title}</div>
-                      {chat.subtitle ? (
-                        <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-center">
-                      {chat.unreadCount > 0 ? (
+          <details className="group">
+            <summary
+              className={`${styles.chatButton} w-full min-w-0 max-w-full cursor-pointer list-none overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+            >
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <svg
+                    viewBox="0 0 20 20" fill="currentColor"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--muted-fg)] transition-transform group-open:rotate-90"
+                  >
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate font-semibold">Менеджеры</span>
+                </div>
+                <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                  {managers.length}
+                </span>
+              </div>
+            </summary>
+
+            <div className="mt-2 grid gap-2">
+              {managers.map((manager) => {
+                const isCurrent = currentManager?.id === manager.id;
+                const status = onlineManagers.get(manager.id);
+                const isOnline = !!status;
+                const statusColor = !isOnline
+                  ? "bg-gray-400"
+                  : status === "away"
+                    ? "bg-yellow-500"
+                    : status === "coffee"
+                      ? "bg-amber-700"
+                      : "bg-green-500";
+                const statusLabel = !isOnline
+                  ? "Офлайн"
+                  : status === "away"
+                    ? "Отошёл"
+                    : status === "coffee"
+                      ? "Кофе-пауза"
+                      : "В сети";
+
+                return (
+                  <div
+                    key={manager.id}
+                    className={`${styles.chatButton} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 sm:rounded-[24px] sm:py-4 ${isCurrent ? styles.chatButtonActive : ""}`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
+                      <span className="truncate font-semibold">
+                        {manager.first_name} {manager.last_name}
+                      </span>
+                      {isCurrent && (
                         <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
-                          {chat.unreadCount}
+                          Вы
                         </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--muted-fg)]">{manager.position}</div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-[var(--muted-fg)]">
+                      <span>{statusLabel}</span>
+                      {status === "coffee" && <span>☕</span>}
+                      <span className="truncate">{manager.email}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
+
+          <details open className="group">
+            <summary
+              className={`${styles.chatButton} w-full min-w-0 max-w-full cursor-pointer list-none overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+            >
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <svg
+                    viewBox="0 0 20 20" fill="currentColor"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--muted-fg)] transition-transform group-open:rotate-90"
+                  >
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate font-semibold">Чаты с клиентами</span>
+                </div>
+                <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                  {chats.length}
+                </span>
+              </div>
+            </summary>
+
+            <div className="mt-2 grid gap-2">
+              {chats.length === 0 ? (
+                <div
+                  className={`${styles.muted} rounded-2xl border px-4 py-5 text-sm`}
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  Ничего не найдено по текущему запросу.
+                </div>
+              ) : (
+                chats.map((chat) => {
+                  const isActive = chat.clientId === activeClientId;
+
+                  return (
+                    <button
+                      key={chat.clientId}
+                      type="button"
+                      onClick={() => onSelectChat(chat.clientId)}
+                      className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+                    >
+                      <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold">{chat.title}</div>
+                          {chat.subtitle ? (
+                            <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
+                          ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center">
+                          {chat.unreadCount > 0 ? (
+                            <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                              {chat.unreadCount}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>
+                      {chat.telegramChatId ? (
+                        <div className={`${styles.muted} mt-2 truncate text-xs`}>
+                          Telegram chat: {chat.telegramChatId}
+                        </div>
                       ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>
-                  {chat.telegramChatId ? (
-                    <div className={`${styles.muted} mt-2 truncate text-xs`}>
-                      Telegram chat: {chat.telegramChatId}
-                    </div>
-                  ) : null}
-                  <div className={`${styles.muted} mt-2 text-xs`}>
-                    {formatTime(chat.lastTimestamp)}
-                  </div>
-                </button>
-              );
-            })
-          )}
+                      <div className={`${styles.muted} mt-2 text-xs`}>
+                        {formatTime(chat.lastTimestamp)}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </details>
         </div>
       </div>
     </aside>

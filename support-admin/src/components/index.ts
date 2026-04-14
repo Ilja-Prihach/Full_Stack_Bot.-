@@ -13,4 +13,6 @@ export type {
   ClientReadState,
   ManagerProfile,
   Message,
+  TeamMessage,
+  TeamReadState,
 } from "./dashboard-shared";

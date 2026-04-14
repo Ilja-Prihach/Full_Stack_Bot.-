@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components";
-import type { ClientAssignment, ClientReadState, ManagerProfile, Message } from "@/components";
+import type { ClientAssignment, ClientReadState, ManagerProfile, Message, TeamMessage, TeamReadState } from "@/components";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
@@ -24,7 +24,7 @@ export default async function Home() {
   }
 
   const supabase = createAuthenticatedSupabaseClient(accessToken);
-  const [{ data: userData }, { data: messages, error: messagesError }, { data: managersData }, { data: assignmentsData }] =
+  const [{ data: userData }, { data: messages, error: messagesError }, { data: managersData }, { data: assignmentsData }, { data: teamMessagesData }] =
     await Promise.all([
       supabase.auth.getUser(accessToken),
       supabase
@@ -71,6 +71,21 @@ export default async function Home() {
             last_reassigned_by_manager_name
           `,
         ),
+      supabase
+        .from("team_messages")
+        .select(
+          `
+            id,
+            sender_id,
+            text,
+            created_at,
+            managers (
+              first_name,
+              last_name
+            )
+          `,
+        )
+        .order("created_at", { ascending: true }),
     ]);
 
   const typedMessages: Message[] = ((messages ?? []) as RawMessage[]).map((message) => ({
@@ -97,9 +112,41 @@ export default async function Home() {
       ).data ?? []) as ClientReadState[])
     : [];
 
+  // Supabase при JOIN возвращает managers как массив.
+  // Берём первый элемент и собираем "Имя Фамилия" в sender_name.
+  // Если менеджера вдруг нет — фолбэк "Менеджер".
+  const teamMessages: TeamMessage[] = ((teamMessagesData ?? []) as Array<{
+    id: number;
+    sender_id: number;
+    text: string;
+    created_at: string;
+    managers: Array<{ first_name: string; last_name: string }>;
+  }>).map((msg) => ({
+    id: msg.id,
+    sender_id: msg.sender_id,
+    sender_name: msg.managers?.[0]
+      ? `${msg.managers[0].first_name} ${msg.managers[0].last_name}`
+      : "Менеджер",
+    text: msg.text,
+    created_at: msg.created_at,
+  }));
+
+  // Фетчим last_read_message_id для текущего менеджера.
+  // Одна строка — используется для подсчёта непрочитанных в сайдбаре.
+  const teamReadState = currentManager
+    ? ((await supabase
+        .from("team_read_states")
+        .select("manager_id, last_read_message_id")
+        .eq("manager_id", currentManager.id)
+        .maybeSingle()
+      ).data as TeamReadState | null)
+    : null;
+
   return (
     <AdminDashboard
       initialMessages={typedMessages}
+      teamMessages={teamMessages}
+      teamReadState={teamReadState}
       errorMessage={messagesError?.message ?? null}
       currentManager={currentManager}
       managers={managers}

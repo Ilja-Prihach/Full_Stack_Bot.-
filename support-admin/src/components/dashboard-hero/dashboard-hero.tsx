@@ -7,6 +7,8 @@ import styles from "./dashboard-hero.module.css";
 type DashboardHeroProps = {
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  managerStatus: "online" | "away" | "coffee";
+  onStatusChange: (status: "online" | "away" | "coffee") => void;
   totalMessages: number;
   totalChats: number;
   theme: "light" | "dark";
@@ -47,6 +49,8 @@ function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
 export function DashboardHero({
   currentManager = null,
   managers = [],
+  managerStatus,
+  onStatusChange,
   totalMessages,
   totalChats,
   theme,
@@ -123,6 +127,9 @@ export function DashboardHero({
                   {currentManager?.position ?? "Профиль не найден"}
                 </span>
               </span>
+              <svg viewBox="0 0 20 20" fill="currentColor" className="ml-1 h-4 w-4 shrink-0 text-white/50">
+                <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+              </svg>
             </summary>
 
             <div className={`${styles.managerPopover} absolute right-0 top-[calc(100%+0.75rem)] z-20 w-[min(24rem,calc(100vw-2rem))] rounded-[24px] p-4 text-slate-900 shadow-2xl`}>
@@ -139,6 +146,32 @@ export function DashboardHero({
                 <div className="mt-3 text-sm text-slate-500">
                   {currentManager?.email ?? "Email недоступен"}
                 </div>
+              </div>
+
+              <div className="mt-3 space-y-1">
+                <div className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Статус
+                </div>
+                {[
+                  { key: "online" as const, label: "В сети", color: "bg-green-500" },
+                  { key: "away" as const, label: "Отошёл", color: "bg-yellow-500" },
+                  { key: "coffee" as const, label: "Кофе-пауза", color: "bg-amber-700" },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => onStatusChange(option.key)}
+                    className={`flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-sm transition ${
+                      managerStatus === option.key
+                        ? "bg-slate-100 font-medium text-slate-900"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${option.color}`} />
+                    <span>{option.label}</span>
+                    {option.key === "coffee" && <span className="text-sm">☕</span>}
+                  </button>
+                ))}
               </div>
 
               <div className="mt-3">

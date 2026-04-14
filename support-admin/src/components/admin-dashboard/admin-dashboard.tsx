@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useDeferredValue, useState, useTransition } from "react";
+import { useEffect, useDeferredValue, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserRealtimeClient } from "@/lib/supabase";
 import { ChatSidebar } from "../chat-sidebar";
@@ -12,6 +12,8 @@ import styles from "./admin-dashboard.module.css";
 
 export function AdminDashboard({
   initialMessages,
+  teamMessages = [],
+  teamReadState,
   errorMessage,
   currentManager = null,
   managers = [],
@@ -24,8 +26,18 @@ export function AdminDashboard({
   const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [isTeamChatActive, setIsTeamChatActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
+  const [managerStatus, setManagerStatus] = useState<"online" | "away" | "coffee">("online");
+  const [onlineManagers, setOnlineManagers] = useState<Map<number, string>>(new Map());
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
+  const managerRef = useRef(currentManager);
+  managerRef.current = currentManager;
+  const statusRef = useRef(managerStatus);
+  statusRef.current = managerStatus;
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
   const chatPreviews = getChatPreviews(initialMessages, readStates);
@@ -112,6 +124,13 @@ export function AdminDashboard({
   }, []);
 
   useEffect(() => {
+    const savedStatus = window.localStorage.getItem("support-admin-status");
+    if (savedStatus === "online" || savedStatus === "away" || savedStatus === "coffee") {
+      queueMicrotask(() => setManagerStatus(savedStatus));
+    }
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("support-admin-theme", theme);
   }, [theme]);
@@ -129,7 +148,9 @@ export function AdminDashboard({
       }
 
       currentChannel = supabase
-        .channel("admin-messages-realtime")
+        .channel("admin-messages-realtime", {
+          config: { presence: { key: managerRef.current?.id.toString() ?? "unknown" } },
+        })
         .on(
           "postgres_changes",
           {
@@ -143,13 +164,65 @@ export function AdminDashboard({
             });
           },
         )
-        .subscribe();
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "team_messages",
+          },
+          () => {
+            startRefresh(() => {
+              router.refresh();
+            });
+          },
+        )
+        .on("presence", { event: "sync" }, () => {
+          if (!isActive) return;
+          const state = currentChannel!.presenceState<Record<string, unknown>>();
+          console.log("[presence] sync, raw state:", JSON.stringify(state));
+          const map = new Map<number, string>();
+          for (const presences of Object.values(state)) {
+            for (const p of presences) {
+              if (typeof p.manager_id === "number") {
+                map.set(p.manager_id, typeof p.status === "string" ? p.status : "online");
+              }
+            }
+          }
+          console.log("[presence] resolved map:", JSON.stringify(Object.fromEntries(map)));
+          setOnlineManagers(map);
+        })
+        .subscribe(async (subscribeStatus) => {
+          console.log("[channel] subscribe status:", subscribeStatus, "isActive:", isActive);
+          if ((subscribeStatus as string) === "SUBSCRIBED") {
+            isSubscribedRef.current = true;
+            const mgr = managerRef.current;
+            if (mgr) {
+              const savedStatus = window.localStorage.getItem("support-admin-status");
+              const currentStatus = savedStatus === "online" || savedStatus === "away" || savedStatus === "coffee"
+                ? savedStatus
+                : "online";
+              await currentChannel!.track({ manager_id: mgr.id, status: currentStatus });
+            }
+          } else if ((subscribeStatus as string) !== "SUBSCRIBING" && isActive) {
+            isSubscribedRef.current = false;
+            setTimeout(async () => {
+              if (!isActive) return;
+              await supabase.removeChannel(currentChannel!);
+              if (!isActive) return;
+              await setupRealtime();
+            }, 3000);
+          }
+        });
+
+      channelRef.current = currentChannel;
     }
 
     void setupRealtime();
 
     return () => {
       isActive = false;
+      isSubscribedRef.current = false;
 
       if (currentChannel) {
         void supabase.removeChannel(currentChannel);
@@ -165,12 +238,31 @@ export function AdminDashboard({
     });
   }
 
+  function handleStatusChange(status: "online" | "away" | "coffee") {
+    setManagerStatus(status);
+    window.localStorage.setItem("support-admin-status", status);
+    const channel = channelRef.current;
+    const manager = managerRef.current;
+    console.log("[status] change to:", status, "subscribed:", isSubscribedRef.current, "hasManager:", !!manager, "hasChannel:", !!channel);
+    if (channel && manager && isSubscribedRef.current) {
+      channel.track({ manager_id: manager.id, status }).then(() => {
+        console.log("[status] track resolved:", status);
+      }).catch((err: unknown) => {
+        console.error("[status] track error:", err);
+      });
+    } else {
+      console.warn("[status] skipped track — subscribed:", isSubscribedRef.current, "manager:", !!manager, "channel:", !!channel);
+    }
+  }
+
   return (
     <main className="min-h-screen overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:h-screen lg:overflow-hidden lg:px-8 lg:py-4">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 lg:h-full lg:gap-4">
         <DashboardHero
           currentManager={currentManager}
           managers={managers}
+          managerStatus={managerStatus}
+          onStatusChange={handleStatusChange}
           totalMessages={initialMessages.length}
           totalChats={chatPreviews.length}
           theme={theme}
@@ -197,17 +289,31 @@ export function AdminDashboard({
                 assignmentFilter={assignmentFilter}
                 currentManager={currentManager}
                 managers={managers}
+                onlineManagers={onlineManagers}
+                isTeamChatActive={isTeamChatActive}
+                teamMessages={teamMessages}
+                teamReadState={teamReadState}
                 onSearchChange={setSearchQuery}
                 onAssignmentFilterChange={setAssignmentFilter}
-                onSelectChat={setSelectedClientId}
+                onSelectChat={(clientId) => {
+                  setIsTeamChatActive(false);
+                  setSelectedClientId(clientId);
+                }}
+                onSelectTeamChat={() => {
+                  setIsTeamChatActive(true);
+                  setSelectedClientId(null);
+                }}
               />
 
               <MessagePanel
-                selectedChat={selectedChat}
-                messages={orderedVisibleMessages}
+                selectedChat={isTeamChatActive ? null : selectedChat}
+                messages={isTeamChatActive ? [] : orderedVisibleMessages}
+                teamMessages={isTeamChatActive ? teamMessages : []}
+                isTeamChatActive={isTeamChatActive}
+                onlineManagers={onlineManagers}
                 currentManager={currentManager}
                 managers={managers}
-                assignment={selectedAssignment}
+                assignment={isTeamChatActive ? null : selectedAssignment}
               />
             </div>
           )}
