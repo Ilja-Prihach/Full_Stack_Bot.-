@@ -12,7 +12,7 @@ import styles from "./admin-dashboard.module.css";
 
 export function AdminDashboard({
   initialMessages,
-  teamMessages,
+  teamMessages = [],
   teamReadState,
   errorMessage,
   currentManager = null,
