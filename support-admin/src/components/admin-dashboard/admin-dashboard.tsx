@@ -12,6 +12,8 @@ import styles from "./admin-dashboard.module.css";
 
 export function AdminDashboard({
   initialMessages,
+  teamMessages,
+  teamReadState,
   errorMessage,
   currentManager = null,
   managers = [],
@@ -24,6 +26,7 @@ export function AdminDashboard({
   const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
+  const [isTeamChatActive, setIsTeamChatActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const deferredSearchQuery = useDeferredValue(searchQuery);
@@ -143,6 +146,19 @@ export function AdminDashboard({
             });
           },
         )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "team_messages",
+          },
+          () => {
+            startRefresh(() => {
+              router.refresh();
+            });
+          },
+        )
         .subscribe();
     }
 
@@ -197,17 +213,26 @@ export function AdminDashboard({
                 assignmentFilter={assignmentFilter}
                 currentManager={currentManager}
                 managers={managers}
+                isTeamChatActive={isTeamChatActive}
+                teamMessages={teamMessages}
+                teamReadState={teamReadState}
                 onSearchChange={setSearchQuery}
                 onAssignmentFilterChange={setAssignmentFilter}
                 onSelectChat={setSelectedClientId}
+                onSelectTeamChat={() => {
+                  setIsTeamChatActive(true);
+                  setSelectedClientId(null);
+                }}
               />
 
               <MessagePanel
-                selectedChat={selectedChat}
-                messages={orderedVisibleMessages}
+                selectedChat={isTeamChatActive ? null : selectedChat}
+                messages={isTeamChatActive ? [] : orderedVisibleMessages}
+                teamMessages={isTeamChatActive ? teamMessages : []}
+                isTeamChatActive={isTeamChatActive}
                 currentManager={currentManager}
                 managers={managers}
-                assignment={selectedAssignment}
+                assignment={isTeamChatActive ? null : selectedAssignment}
               />
             </div>
           )}
