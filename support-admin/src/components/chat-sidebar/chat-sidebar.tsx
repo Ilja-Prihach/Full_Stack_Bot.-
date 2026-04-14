@@ -229,52 +229,76 @@ export function ChatSidebar({
               </div>
             )}
           </button>
-          {chats.length === 0 ? (
-            <div
-              className={`${styles.muted} rounded-2xl border px-4 py-5 text-sm`}
-              style={{ borderColor: "var(--line)" }}
-            >
-              Ничего не найдено по текущему запросу.
-            </div>
-          ) : (
-            chats.map((chat) => {
-              const isActive = chat.clientId === activeClientId;
 
-              return (
-                <button
-                  key={chat.clientId}
-                  type="button"
-                  onClick={() => onSelectChat(chat.clientId)}
-                  className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+          <details open className="group">
+            <summary
+              className={`${styles.chatButton} w-full min-w-0 max-w-full cursor-pointer list-none overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+            >
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <svg
+                    viewBox="0 0 20 20" fill="currentColor"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--muted-fg)] transition-transform group-open:rotate-90"
+                  >
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate font-semibold">Чаты с клиентами</span>
+                </div>
+                <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                  {chats.length}
+                </span>
+              </div>
+            </summary>
+
+            <div className="mt-2 grid gap-2">
+              {chats.length === 0 ? (
+                <div
+                  className={`${styles.muted} rounded-2xl border px-4 py-5 text-sm`}
+                  style={{ borderColor: "var(--line)" }}
                 >
-                  <div className="flex min-w-0 items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-semibold">{chat.title}</div>
-                      {chat.subtitle ? (
-                        <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
+                  Ничего не найдено по текущему запросу.
+                </div>
+              ) : (
+                chats.map((chat) => {
+                  const isActive = chat.clientId === activeClientId;
+
+                  return (
+                    <button
+                      key={chat.clientId}
+                      type="button"
+                      onClick={() => onSelectChat(chat.clientId)}
+                      className={`${styles.chatButton} ${isActive ? styles.chatButtonActive : ""} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+                    >
+                      <div className="flex min-w-0 items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-semibold">{chat.title}</div>
+                          {chat.subtitle ? (
+                            <div className={`${styles.muted} truncate text-sm`}>{chat.subtitle}</div>
+                          ) : null}
+                        </div>
+                        <div className="flex shrink-0 items-center">
+                          {chat.unreadCount > 0 ? (
+                            <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                              {chat.unreadCount}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>
+                      {chat.telegramChatId ? (
+                        <div className={`${styles.muted} mt-2 truncate text-xs`}>
+                          Telegram chat: {chat.telegramChatId}
+                        </div>
                       ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-center">
-                      {chat.unreadCount > 0 ? (
-                        <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
-                          {chat.unreadCount}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>
-                  {chat.telegramChatId ? (
-                    <div className={`${styles.muted} mt-2 truncate text-xs`}>
-                      Telegram chat: {chat.telegramChatId}
-                    </div>
-                  ) : null}
-                  <div className={`${styles.muted} mt-2 text-xs`}>
-                    {formatTime(chat.lastTimestamp)}
-                  </div>
-                </button>
-              );
-            })
-          )}
+                      <div className={`${styles.muted} mt-2 text-xs`}>
+                        {formatTime(chat.lastTimestamp)}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </details>
         </div>
       </div>
     </aside>
