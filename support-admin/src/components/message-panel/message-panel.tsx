@@ -17,6 +17,7 @@ type MessagePanelProps = {
   messages: Message[];
   teamMessages: TeamMessage[];
   isTeamChatActive: boolean;
+  onlineManagerIds: number[];
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
   assignment: ClientAssignment | null;
@@ -31,6 +32,7 @@ export function MessagePanel({
   messages,
   teamMessages,
   isTeamChatActive,
+  onlineManagerIds,
   currentManager,
   managers,
   assignment,
@@ -341,8 +343,17 @@ export function MessagePanel({
                         } max-w-[88%] rounded-[20px] px-3 py-3 sm:max-w-[72%] sm:px-4 sm:py-3.5`}
                       >
                         {!isOwn && (
-                          <div className={`${styles.badgeMuted} mb-2 rounded-full px-2.5 py-0.5 text-[11px] inline-block`}>
-                            {message.sender_name}
+                          <div className="mb-2 flex items-center gap-1.5">
+                            <span
+                              className={`inline-block h-2 w-2 rounded-full ${
+                                onlineManagerIds.includes(message.sender_id)
+                                  ? "bg-green-500"
+                                  : "bg-gray-400"
+                              }`}
+                            />
+                            <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5 text-[11px] inline-block`}>
+                              {message.sender_name}
+                            </span>
                           </div>
                         )}
                         <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[13px] leading-5 sm:text-[14px] sm:leading-6">

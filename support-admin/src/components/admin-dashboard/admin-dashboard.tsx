@@ -28,6 +28,7 @@ export function AdminDashboard({
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isTeamChatActive, setIsTeamChatActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
+  const [onlineManagerIds, setOnlineManagerIds] = useState<number[]>([]);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
@@ -132,7 +133,9 @@ export function AdminDashboard({
       }
 
       currentChannel = supabase
-        .channel("admin-messages-realtime")
+        .channel("admin-messages-realtime", {
+          config: { presence: { key: currentManager?.id.toString() ?? "unknown" } },
+        })
         .on(
           "postgres_changes",
           {
@@ -159,7 +162,24 @@ export function AdminDashboard({
             });
           },
         )
-        .subscribe();
+        .on("presence", { event: "sync" }, () => {
+          if (!isActive) return;
+          const state = currentChannel!.presenceState<Record<string, unknown>>();
+          const ids: number[] = [];
+          for (const presences of Object.values(state)) {
+            for (const p of presences) {
+              if (typeof p.manager_id === "number") {
+                ids.push(p.manager_id);
+              }
+            }
+          }
+          setOnlineManagerIds(ids);
+        })
+        .subscribe(async (status) => {
+          if ((status as string) === "SUBSCRIBUTED" && currentManager) {
+            await currentChannel!.track({ manager_id: currentManager.id });
+          }
+        });
     }
 
     void setupRealtime();
@@ -171,7 +191,7 @@ export function AdminDashboard({
         void supabase.removeChannel(currentChannel);
       }
     };
-  }, [router, startRefresh, realtimeAccessToken]);
+  }, [router, startRefresh, realtimeAccessToken, currentManager]);
 
   function handleLogout() {
     startLogout(async () => {
@@ -233,6 +253,7 @@ export function AdminDashboard({
                 messages={isTeamChatActive ? [] : orderedVisibleMessages}
                 teamMessages={isTeamChatActive ? teamMessages : []}
                 isTeamChatActive={isTeamChatActive}
+                onlineManagerIds={onlineManagerIds}
                 currentManager={currentManager}
                 managers={managers}
                 assignment={isTeamChatActive ? null : selectedAssignment}
