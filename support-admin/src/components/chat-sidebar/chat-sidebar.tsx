@@ -12,6 +12,7 @@ type ChatSidebarProps = {
   assignmentFilter: ChatAssignmentFilter;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  onlineManagers: Map<number, string>;
   isTeamChatActive: boolean;
   teamMessages: TeamMessage[];
   teamReadState: TeamReadState | null;
@@ -61,6 +62,7 @@ export function ChatSidebar({
   assignmentFilter,
   currentManager,
   managers,
+  onlineManagers,
   isTeamChatActive,
   teamMessages = [],
   teamReadState,
@@ -229,6 +231,74 @@ export function ChatSidebar({
               </div>
             )}
           </button>
+
+          <details className="group">
+            <summary
+              className={`${styles.chatButton} w-full min-w-0 max-w-full cursor-pointer list-none overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
+            >
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <svg
+                    viewBox="0 0 20 20" fill="currentColor"
+                    className="h-3.5 w-3.5 shrink-0 text-[var(--muted-fg)] transition-transform group-open:rotate-90"
+                  >
+                    <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+                  </svg>
+                  <span className="truncate font-semibold">Менеджеры</span>
+                </div>
+                <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                  {managers.length}
+                </span>
+              </div>
+            </summary>
+
+            <div className="mt-2 grid gap-2">
+              {managers.map((manager) => {
+                const isCurrent = currentManager?.id === manager.id;
+                const status = onlineManagers.get(manager.id);
+                const isOnline = !!status;
+                const statusColor = !isOnline
+                  ? "bg-gray-400"
+                  : status === "away"
+                    ? "bg-yellow-500"
+                    : status === "coffee"
+                      ? "bg-amber-700"
+                      : "bg-green-500";
+                const statusLabel = !isOnline
+                  ? "Офлайн"
+                  : status === "away"
+                    ? "Отошёл"
+                    : status === "coffee"
+                      ? "Кофе-пауза"
+                      : "В сети";
+
+                return (
+                  <div
+                    key={manager.id}
+                    className={`${styles.chatButton} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 sm:rounded-[24px] sm:py-4 ${isCurrent ? styles.chatButtonActive : ""}`}
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
+                      <span className="truncate font-semibold">
+                        {manager.first_name} {manager.last_name}
+                      </span>
+                      {isCurrent && (
+                        <span className={`${styles.unreadBadge} rounded-full px-2 py-0.5 text-[11px] font-medium`}>
+                          Вы
+                        </span>
+                      )}
+                    </div>
+                    <div className="mt-1 text-sm text-[var(--muted-fg)]">{manager.position}</div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-[var(--muted-fg)]">
+                      <span>{statusLabel}</span>
+                      {status === "coffee" && <span>☕</span>}
+                      <span className="truncate">{manager.email}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </details>
 
           <details open className="group">
             <summary

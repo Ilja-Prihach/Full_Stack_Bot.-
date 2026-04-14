@@ -247,6 +247,7 @@ export function AdminDashboard({
                 assignmentFilter={assignmentFilter}
                 currentManager={currentManager}
                 managers={managers}
+                onlineManagers={onlineManagers}
                 isTeamChatActive={isTeamChatActive}
                 teamMessages={teamMessages}
                 teamReadState={teamReadState}
