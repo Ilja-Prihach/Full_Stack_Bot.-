@@ -6,6 +6,8 @@ export type {
   ClientReadState,
   ManagerProfile,
   Message,
+  TeamMessage,
+  TeamReadState,
 } from "./dashboard.types";
 export {
   formatTime,
