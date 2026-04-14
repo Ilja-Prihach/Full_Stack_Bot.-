@@ -218,7 +218,10 @@ export function AdminDashboard({
                 teamReadState={teamReadState}
                 onSearchChange={setSearchQuery}
                 onAssignmentFilterChange={setAssignmentFilter}
-                onSelectChat={setSelectedClientId}
+                onSelectChat={(clientId) => {
+                  setIsTeamChatActive(false);
+                  setSelectedClientId(clientId);
+                }}
                 onSelectTeamChat={() => {
                   setIsTeamChatActive(true);
                   setSelectedClientId(null);
