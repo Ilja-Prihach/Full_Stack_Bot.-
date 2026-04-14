@@ -33,6 +33,11 @@ export function AdminDashboard({
   const [theme, setTheme] = useState<"light" | "dark">("light");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channelRef = useRef<any>(null);
+  const isSubscribedRef = useRef(false);
+  const managerRef = useRef(currentManager);
+  managerRef.current = currentManager;
+  const statusRef = useRef(managerStatus);
+  statusRef.current = managerStatus;
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
   const chatPreviews = getChatPreviews(initialMessages, readStates);
@@ -119,6 +124,13 @@ export function AdminDashboard({
   }, []);
 
   useEffect(() => {
+    const savedStatus = window.localStorage.getItem("support-admin-status");
+    if (savedStatus === "online" || savedStatus === "away" || savedStatus === "coffee") {
+      queueMicrotask(() => setManagerStatus(savedStatus));
+    }
+  }, []);
+
+  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("support-admin-theme", theme);
   }, [theme]);
@@ -137,7 +149,7 @@ export function AdminDashboard({
 
       currentChannel = supabase
         .channel("admin-messages-realtime", {
-          config: { presence: { key: currentManager?.id.toString() ?? "unknown" } },
+          config: { presence: { key: managerRef.current?.id.toString() ?? "unknown" } },
         })
         .on(
           "postgres_changes",
@@ -168,6 +180,7 @@ export function AdminDashboard({
         .on("presence", { event: "sync" }, () => {
           if (!isActive) return;
           const state = currentChannel!.presenceState<Record<string, unknown>>();
+          console.log("[presence] sync, raw state:", JSON.stringify(state));
           const map = new Map<number, string>();
           for (const presences of Object.values(state)) {
             for (const p of presences) {
@@ -176,11 +189,29 @@ export function AdminDashboard({
               }
             }
           }
+          console.log("[presence] resolved map:", JSON.stringify(Object.fromEntries(map)));
           setOnlineManagers(map);
         })
-        .subscribe(async (status) => {
-          if ((status as string) === "SUBSCRIBUTED" && currentManager) {
-            await currentChannel!.track({ manager_id: currentManager.id, status: "online" });
+        .subscribe(async (subscribeStatus) => {
+          console.log("[channel] subscribe status:", subscribeStatus, "isActive:", isActive);
+          if ((subscribeStatus as string) === "SUBSCRIBED") {
+            isSubscribedRef.current = true;
+            const mgr = managerRef.current;
+            if (mgr) {
+              const savedStatus = window.localStorage.getItem("support-admin-status");
+              const currentStatus = savedStatus === "online" || savedStatus === "away" || savedStatus === "coffee"
+                ? savedStatus
+                : "online";
+              await currentChannel!.track({ manager_id: mgr.id, status: currentStatus });
+            }
+          } else if ((subscribeStatus as string) !== "SUBSCRIBING" && isActive) {
+            isSubscribedRef.current = false;
+            setTimeout(async () => {
+              if (!isActive) return;
+              await supabase.removeChannel(currentChannel!);
+              if (!isActive) return;
+              await setupRealtime();
+            }, 3000);
           }
         });
 
@@ -191,12 +222,13 @@ export function AdminDashboard({
 
     return () => {
       isActive = false;
+      isSubscribedRef.current = false;
 
       if (currentChannel) {
         void supabase.removeChannel(currentChannel);
       }
     };
-  }, [router, startRefresh, realtimeAccessToken, currentManager]);
+  }, [router, startRefresh, realtimeAccessToken]);
 
   function handleLogout() {
     startLogout(async () => {
@@ -208,8 +240,18 @@ export function AdminDashboard({
 
   function handleStatusChange(status: "online" | "away" | "coffee") {
     setManagerStatus(status);
-    if (channelRef.current && currentManager) {
-      void channelRef.current.track({ manager_id: currentManager.id, status });
+    window.localStorage.setItem("support-admin-status", status);
+    const channel = channelRef.current;
+    const manager = managerRef.current;
+    console.log("[status] change to:", status, "subscribed:", isSubscribedRef.current, "hasManager:", !!manager, "hasChannel:", !!channel);
+    if (channel && manager && isSubscribedRef.current) {
+      channel.track({ manager_id: manager.id, status }).then(() => {
+        console.log("[status] track resolved:", status);
+      }).catch((err: unknown) => {
+        console.error("[status] track error:", err);
+      });
+    } else {
+      console.warn("[status] skipped track — subscribed:", isSubscribedRef.current, "manager:", !!manager, "channel:", !!channel);
     }
   }
 
