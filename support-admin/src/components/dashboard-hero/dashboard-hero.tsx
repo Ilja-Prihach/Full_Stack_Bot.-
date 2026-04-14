@@ -7,6 +7,8 @@ import styles from "./dashboard-hero.module.css";
 type DashboardHeroProps = {
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  managerStatus: "online" | "away" | "coffee";
+  onStatusChange: (status: "online" | "away" | "coffee") => void;
   totalMessages: number;
   totalChats: number;
   theme: "light" | "dark";
@@ -47,6 +49,8 @@ function ThemeIcon({ theme }: { theme: "light" | "dark" }) {
 export function DashboardHero({
   currentManager = null,
   managers = [],
+  managerStatus,
+  onStatusChange,
   totalMessages,
   totalChats,
   theme,
@@ -139,6 +143,32 @@ export function DashboardHero({
                 <div className="mt-3 text-sm text-slate-500">
                   {currentManager?.email ?? "Email недоступен"}
                 </div>
+              </div>
+
+              <div className="mt-3 space-y-1">
+                <div className="px-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Статус
+                </div>
+                {[
+                  { key: "online" as const, label: "В сети", color: "bg-green-500" },
+                  { key: "away" as const, label: "Отошёл", color: "bg-yellow-500" },
+                  { key: "coffee" as const, label: "Кофе-пауза", color: "bg-amber-700" },
+                ].map((option) => (
+                  <button
+                    key={option.key}
+                    type="button"
+                    onClick={() => onStatusChange(option.key)}
+                    className={`flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-sm transition ${
+                      managerStatus === option.key
+                        ? "bg-slate-100 font-medium text-slate-900"
+                        : "text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${option.color}`} />
+                    <span>{option.label}</span>
+                    {option.key === "coffee" && <span className="text-sm">☕</span>}
+                  </button>
+                ))}
               </div>
 
               <div className="mt-3">

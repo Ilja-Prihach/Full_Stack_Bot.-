@@ -17,7 +17,7 @@ type MessagePanelProps = {
   messages: Message[];
   teamMessages: TeamMessage[];
   isTeamChatActive: boolean;
-  onlineManagerIds: number[];
+  onlineManagers: Map<number, string>;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
   assignment: ClientAssignment | null;
@@ -32,7 +32,7 @@ export function MessagePanel({
   messages,
   teamMessages,
   isTeamChatActive,
-  onlineManagerIds,
+  onlineManagers,
   currentManager,
   managers,
   assignment,
@@ -346,14 +346,24 @@ export function MessagePanel({
                           <div className="mb-2 flex items-center gap-1.5">
                             <span
                               className={`inline-block h-2 w-2 rounded-full ${
-                                onlineManagerIds.includes(message.sender_id)
-                                  ? "bg-green-500"
-                                  : "bg-gray-400"
+                                !onlineManagers.has(message.sender_id)
+                                  ? "bg-gray-400"
+                                  : onlineManagers.get(message.sender_id) === "away"
+                                    ? "bg-yellow-500"
+                                    : onlineManagers.get(message.sender_id) === "coffee"
+                                      ? "bg-amber-700"
+                                      : "bg-green-500"
                               }`}
                             />
                             <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5 text-[11px] inline-block`}>
                               {message.sender_name}
                             </span>
+                            {onlineManagers.has(message.sender_id) && onlineManagers.get(message.sender_id) === "away" && (
+                              <span className="text-[10px] text-yellow-600">отошёл</span>
+                            )}
+                            {onlineManagers.has(message.sender_id) && onlineManagers.get(message.sender_id) === "coffee" && (
+                              <span className="text-xs">☕</span>
+                            )}
                           </div>
                         )}
                         <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[13px] leading-5 sm:text-[14px] sm:leading-6">

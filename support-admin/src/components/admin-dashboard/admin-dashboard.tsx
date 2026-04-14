@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useDeferredValue, useState, useTransition } from "react";
+import { useEffect, useDeferredValue, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserRealtimeClient } from "@/lib/supabase";
 import { ChatSidebar } from "../chat-sidebar";
@@ -28,8 +28,11 @@ export function AdminDashboard({
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isTeamChatActive, setIsTeamChatActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
-  const [onlineManagerIds, setOnlineManagerIds] = useState<number[]>([]);
+  const [managerStatus, setManagerStatus] = useState<"online" | "away" | "coffee">("online");
+  const [onlineManagers, setOnlineManagers] = useState<Map<number, string>>(new Map());
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const channelRef = useRef<any>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
   const chatPreviews = getChatPreviews(initialMessages, readStates);
@@ -165,21 +168,23 @@ export function AdminDashboard({
         .on("presence", { event: "sync" }, () => {
           if (!isActive) return;
           const state = currentChannel!.presenceState<Record<string, unknown>>();
-          const ids: number[] = [];
+          const map = new Map<number, string>();
           for (const presences of Object.values(state)) {
             for (const p of presences) {
               if (typeof p.manager_id === "number") {
-                ids.push(p.manager_id);
+                map.set(p.manager_id, typeof p.status === "string" ? p.status : "online");
               }
             }
           }
-          setOnlineManagerIds(ids);
+          setOnlineManagers(map);
         })
         .subscribe(async (status) => {
           if ((status as string) === "SUBSCRIBUTED" && currentManager) {
-            await currentChannel!.track({ manager_id: currentManager.id });
+            await currentChannel!.track({ manager_id: currentManager.id, status: "online" });
           }
         });
+
+      channelRef.current = currentChannel;
     }
 
     void setupRealtime();
@@ -201,12 +206,21 @@ export function AdminDashboard({
     });
   }
 
+  function handleStatusChange(status: "online" | "away" | "coffee") {
+    setManagerStatus(status);
+    if (channelRef.current && currentManager) {
+      void channelRef.current.track({ manager_id: currentManager.id, status });
+    }
+  }
+
   return (
     <main className="min-h-screen overflow-x-hidden px-3 py-3 sm:px-5 sm:py-5 lg:h-screen lg:overflow-hidden lg:px-8 lg:py-4">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 lg:h-full lg:gap-4">
         <DashboardHero
           currentManager={currentManager}
           managers={managers}
+          managerStatus={managerStatus}
+          onStatusChange={handleStatusChange}
           totalMessages={initialMessages.length}
           totalChats={chatPreviews.length}
           theme={theme}
@@ -253,7 +267,7 @@ export function AdminDashboard({
                 messages={isTeamChatActive ? [] : orderedVisibleMessages}
                 teamMessages={isTeamChatActive ? teamMessages : []}
                 isTeamChatActive={isTeamChatActive}
-                onlineManagerIds={onlineManagerIds}
+                onlineManagers={onlineManagers}
                 currentManager={currentManager}
                 managers={managers}
                 assignment={isTeamChatActive ? null : selectedAssignment}
