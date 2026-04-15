@@ -5,11 +5,12 @@ import { useRouter } from "next/navigation";
 import type {
   ChatPreview,
   ClientAssignment,
+  ManagerDisplayStatus,
   ManagerProfile,
   Message,
   TeamMessage,
 } from "../dashboard-shared";
-import { formatTime } from "../dashboard-shared";
+import { formatTime, getManagerStatusMeta } from "../dashboard-shared";
 import styles from "./message-panel.module.css";
 
 type MessagePanelProps = {
@@ -17,7 +18,7 @@ type MessagePanelProps = {
   messages: Message[];
   teamMessages: TeamMessage[];
   isTeamChatActive: boolean;
-  onlineManagers: Map<number, string>;
+  managerStatuses: Map<number, ManagerDisplayStatus>;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
   assignment: ClientAssignment | null;
@@ -32,7 +33,7 @@ export function MessagePanel({
   messages,
   teamMessages,
   isTeamChatActive,
-  onlineManagers,
+  managerStatuses,
   currentManager,
   managers,
   assignment,
@@ -329,6 +330,8 @@ export function MessagePanel({
               ) : (
                 teamMessages.map((message) => {
                   const isOwn = message.sender_id === currentManager?.id;
+                  const senderStatus = managerStatuses.get(message.sender_id) ?? "offline";
+                  const senderStatusMeta = getManagerStatusMeta(senderStatus);
 
                   return (
                     <article
@@ -345,23 +348,15 @@ export function MessagePanel({
                         {!isOwn && (
                           <div className="mb-2 flex items-center gap-1.5">
                             <span
-                              className={`inline-block h-2 w-2 rounded-full ${
-                                !onlineManagers.has(message.sender_id)
-                                  ? "bg-gray-400"
-                                  : onlineManagers.get(message.sender_id) === "away"
-                                    ? "bg-yellow-500"
-                                    : onlineManagers.get(message.sender_id) === "coffee"
-                                      ? "bg-amber-700"
-                                      : "bg-green-500"
-                              }`}
+                              className={`inline-block h-2 w-2 rounded-full ${senderStatusMeta.colorClassName}`}
                             />
                             <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5 text-[11px] inline-block`}>
                               {message.sender_name}
                             </span>
-                            {onlineManagers.has(message.sender_id) && onlineManagers.get(message.sender_id) === "away" && (
+                            {senderStatus === "away" && (
                               <span className="text-[10px] text-yellow-600">отошёл</span>
                             )}
-                            {onlineManagers.has(message.sender_id) && onlineManagers.get(message.sender_id) === "coffee" && (
+                            {senderStatusMeta.showCoffeeIcon && (
                               <span className="text-xs">☕</span>
                             )}
                           </div>

@@ -1,8 +1,15 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { ChatAssignmentFilter, ChatPreview, ManagerProfile, TeamMessage, TeamReadState } from "../dashboard-shared";
-import { formatTime } from "../dashboard-shared";
+import type {
+  ChatAssignmentFilter,
+  ChatPreview,
+  ManagerDisplayStatus,
+  ManagerProfile,
+  TeamMessage,
+  TeamReadState,
+} from "../dashboard-shared";
+import { formatTime, getManagerStatusMeta } from "../dashboard-shared";
 import styles from "./chat-sidebar.module.css";
 
 type ChatSidebarProps = {
@@ -12,7 +19,7 @@ type ChatSidebarProps = {
   assignmentFilter: ChatAssignmentFilter;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
-  onlineManagers: Map<number, string>;
+  managerStatuses: Map<number, ManagerDisplayStatus>;
   isTeamChatActive: boolean;
   teamMessages: TeamMessage[];
   teamReadState: TeamReadState | null;
@@ -62,7 +69,7 @@ export function ChatSidebar({
   assignmentFilter,
   currentManager,
   managers,
-  onlineManagers,
+  managerStatuses,
   isTeamChatActive,
   teamMessages = [],
   teamReadState,
@@ -255,22 +262,8 @@ export function ChatSidebar({
             <div className="mt-2 grid gap-2">
               {managers.map((manager) => {
                 const isCurrent = currentManager?.id === manager.id;
-                const status = onlineManagers.get(manager.id);
-                const isOnline = !!status;
-                const statusColor = !isOnline
-                  ? "bg-gray-400"
-                  : status === "away"
-                    ? "bg-yellow-500"
-                    : status === "coffee"
-                      ? "bg-amber-700"
-                      : "bg-green-500";
-                const statusLabel = !isOnline
-                  ? "Офлайн"
-                  : status === "away"
-                    ? "Отошёл"
-                    : status === "coffee"
-                      ? "Кофе-пауза"
-                      : "В сети";
+                const status = managerStatuses.get(manager.id) ?? "offline";
+                const statusMeta = getManagerStatusMeta(status);
 
                 return (
                   <div
@@ -278,7 +271,7 @@ export function ChatSidebar({
                     className={`${styles.chatButton} w-full min-w-0 max-w-full overflow-hidden rounded-[22px] border px-4 py-3 sm:rounded-[24px] sm:py-4 ${isCurrent ? styles.chatButtonActive : ""}`}
                   >
                     <div className="flex min-w-0 items-center gap-2">
-                      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
+                      <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${statusMeta.colorClassName}`} />
                       <span className="truncate font-semibold">
                         {manager.first_name} {manager.last_name}
                       </span>
@@ -290,8 +283,8 @@ export function ChatSidebar({
                     </div>
                     <div className="mt-1 text-sm text-[var(--muted-fg)]">{manager.position}</div>
                     <div className="mt-1 flex items-center gap-2 text-xs text-[var(--muted-fg)]">
-                      <span>{statusLabel}</span>
-                      {status === "coffee" && <span>☕</span>}
+                      <span>{statusMeta.label}</span>
+                      {statusMeta.showCoffeeIcon && <span>☕</span>}
                       <span className="truncate">{manager.email}</span>
                     </div>
                   </div>

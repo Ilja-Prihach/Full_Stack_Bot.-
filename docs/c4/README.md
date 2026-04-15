@@ -13,4 +13,4 @@ Diagram rules used here:
 - left-to-right layout
 - orthogonal arrows for readable dependency flow
 - labels describe actual calls and data movement from the current code
-- `public.messages` is the primary persistence boundary
+- Postgres is documented as a shared persistence boundary for dialogs, team chat, read states, assignments, and manager statuses

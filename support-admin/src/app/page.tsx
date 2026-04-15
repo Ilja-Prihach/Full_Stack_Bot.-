@@ -1,7 +1,15 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components";
-import type { ClientAssignment, ClientReadState, ManagerProfile, Message, TeamMessage, TeamReadState } from "@/components";
+import type {
+  ClientAssignment,
+  ClientReadState,
+  ManagerProfile,
+  ManagerStatusRecord,
+  Message,
+  TeamMessage,
+  TeamReadState,
+} from "@/components";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
@@ -24,7 +32,14 @@ export default async function Home() {
   }
 
   const supabase = createAuthenticatedSupabaseClient(accessToken);
-  const [{ data: userData }, { data: messages, error: messagesError }, { data: managersData }, { data: assignmentsData }, { data: teamMessagesData }] =
+  const [
+    { data: userData },
+    { data: messages, error: messagesError },
+    { data: managersData },
+    { data: managerStatusesData },
+    { data: assignmentsData },
+    { data: teamMessagesData },
+  ] =
     await Promise.all([
       supabase.auth.getUser(accessToken),
       supabase
@@ -61,6 +76,15 @@ export default async function Home() {
         )
         .order("first_name", { ascending: true }),
       supabase
+        .from("manager_statuses")
+        .select(
+          `
+            manager_id,
+            status,
+            updated_at
+          `,
+        ),
+      supabase
         .from("client_assignments")
         .select(
           `
@@ -93,6 +117,7 @@ export default async function Home() {
     client: message.client[0] ?? null,
   }));
   const managers = (managersData ?? []) as ManagerProfile[];
+  const managerStatuses = (managerStatusesData ?? []) as ManagerStatusRecord[];
   const assignments = (assignmentsData ?? []) as ClientAssignment[];
   const currentManager =
     managers.find((manager) => manager.auth_user_id === userData.user?.id) ?? null;
@@ -150,6 +175,7 @@ export default async function Home() {
       errorMessage={messagesError?.message ?? null}
       currentManager={currentManager}
       managers={managers}
+      managerStatuses={managerStatuses}
       assignments={assignments}
       readStates={readStates}
       realtimeAccessToken={accessToken}

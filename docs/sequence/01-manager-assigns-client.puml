@@ -14,7 +14,7 @@ database "public.client_assignments" as assignments
 database "public.managers" as managers
 
 manager -> ui : Открывает чат клиента
-ui -> api : POST /api/clients/{id}/assign\nclientId, targetManagerId
+ui -> api : POST /api/clients/{id}/assignment\nmanagerId
 api -> managers : Проверяет сессию менеджера\nи загружает профиль актёра
 managers --> api : Актёр найден
 api -> clients : Загружает клиента по id

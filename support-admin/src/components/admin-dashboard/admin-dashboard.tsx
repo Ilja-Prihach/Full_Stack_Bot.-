@@ -1,14 +1,34 @@
 "use client";
 
-import { useEffect, useDeferredValue, useRef, useState, useTransition } from "react";
+import { useDeferredValue, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getBrowserRealtimeClient } from "@/lib/supabase";
 import { ChatSidebar } from "../chat-sidebar";
 import { DashboardHero } from "../dashboard-hero";
-import type { AdminDashboardProps, ChatAssignmentFilter } from "../dashboard-shared";
+import type {
+  AdminDashboardProps,
+  ChatAssignmentFilter,
+  ManagerAvailabilityStatus,
+  ManagerDisplayStatus,
+} from "../dashboard-shared";
 import { getChatPreviews, getDisplayName, getUsernameLabel } from "../dashboard-shared";
 import { MessagePanel } from "../message-panel";
 import styles from "./admin-dashboard.module.css";
+
+type ManagerStatusRealtimePayload = {
+  eventType: "INSERT" | "UPDATE" | "DELETE";
+  new: {
+    manager_id?: number;
+    status?: string;
+  };
+  old: {
+    manager_id?: number;
+  };
+};
+
+function isManagerAvailabilityStatus(value: unknown): value is ManagerAvailabilityStatus {
+  return value === "online" || value === "away" || value === "coffee";
+}
 
 export function AdminDashboard({
   initialMessages,
@@ -17,6 +37,7 @@ export function AdminDashboard({
   errorMessage,
   currentManager = null,
   managers = [],
+  managerStatuses = [],
   assignments = [],
   readStates = [],
   realtimeAccessToken,
@@ -28,16 +49,17 @@ export function AdminDashboard({
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isTeamChatActive, setIsTeamChatActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
-  const [managerStatus, setManagerStatus] = useState<"online" | "away" | "coffee">("online");
-  const [onlineManagers, setOnlineManagers] = useState<Map<number, string>>(new Map());
+  const [managerStatusOverrides, setManagerStatusOverrides] = useState(
+    () => new Map<number, ManagerAvailabilityStatus | null>(),
+  );
+  const [onlineManagerIds, setOnlineManagerIds] = useState<Set<number>>(new Set());
   const [theme, setTheme] = useState<"light" | "dark">("light");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const channelRef = useRef<any>(null);
   const isSubscribedRef = useRef(false);
   const managerRef = useRef(currentManager);
-  managerRef.current = currentManager;
-  const statusRef = useRef(managerStatus);
-  statusRef.current = managerStatus;
+  const reconnectTimeoutRef = useRef<number | null>(null);
+  const presenceKeyRef = useRef<string | null>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
   const chatPreviews = getChatPreviews(initialMessages, readStates);
@@ -45,6 +67,32 @@ export function AdminDashboard({
     assignments.map((assignment) => [assignment.client_id, assignment]),
   );
   const activeClientId = selectedClientId ?? chatPreviews[0]?.clientId ?? null;
+  const managerAvailabilityById = new Map<number, ManagerAvailabilityStatus>(
+    managerStatuses.map((status) => [status.manager_id, status.status]),
+  );
+
+  for (const [managerId, status] of managerStatusOverrides.entries()) {
+    if (status == null) {
+      managerAvailabilityById.delete(managerId);
+      continue;
+    }
+
+    managerAvailabilityById.set(managerId, status);
+  }
+
+  const currentManagerStatus = currentManager
+    ? (managerAvailabilityById.get(currentManager.id) ?? "online")
+    : "online";
+  const managerDisplayStatuses = new Map<number, ManagerDisplayStatus>();
+
+  for (const manager of managers) {
+    managerDisplayStatuses.set(
+      manager.id,
+      onlineManagerIds.has(manager.id)
+        ? (managerAvailabilityById.get(manager.id) ?? "online")
+        : "offline",
+    );
+  }
 
   const visibleChats = chatPreviews.filter((chat) => {
     const assignment = assignmentsByClientId.get(chat.clientId) ?? null;
@@ -94,22 +142,25 @@ export function AdminDashboard({
       message.text.toLowerCase().includes(normalizedQuery)
     );
   });
-  const orderedVisibleMessages = [...visibleMessages].sort(
-    (left, right) => {
-      const createdAtDiff =
-        new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+  const orderedVisibleMessages = [...visibleMessages].sort((left, right) => {
+    const createdAtDiff =
+      new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
 
-      if (createdAtDiff !== 0) {
-        return createdAtDiff;
-      }
+    if (createdAtDiff !== 0) {
+      return createdAtDiff;
+    }
 
-      return Number(left.id) - Number(right.id);
-    },
-  );
+    return Number(left.id) - Number(right.id);
+  });
 
   const selectedChat = visibleChats.find((chat) => chat.clientId === activeClientId) ?? null;
   const selectedAssignment =
     assignments.find((assignment) => assignment.client_id === activeClientId) ?? null;
+
+  useEffect(() => {
+    managerRef.current = currentManager;
+  }, [currentManager]);
+
   useEffect(() => {
     const savedTheme = window.localStorage.getItem("support-admin-theme");
 
@@ -124,13 +175,6 @@ export function AdminDashboard({
   }, []);
 
   useEffect(() => {
-    const savedStatus = window.localStorage.getItem("support-admin-status");
-    if (savedStatus === "online" || savedStatus === "away" || savedStatus === "coffee") {
-      queueMicrotask(() => setManagerStatus(savedStatus));
-    }
-  }, []);
-
-  useEffect(() => {
     document.documentElement.dataset.theme = theme;
     window.localStorage.setItem("support-admin-theme", theme);
   }, [theme]);
@@ -138,7 +182,44 @@ export function AdminDashboard({
   useEffect(() => {
     let isActive = true;
     const supabase = getBrowserRealtimeClient();
-    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+
+    if (!presenceKeyRef.current) {
+      presenceKeyRef.current =
+        window.crypto?.randomUUID?.() ??
+        `presence-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    }
+
+    function clearReconnectTimer() {
+      if (reconnectTimeoutRef.current != null) {
+        window.clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+    }
+
+    function scheduleReconnect(failedChannel: typeof channelRef.current) {
+      if (!isActive || reconnectTimeoutRef.current != null) {
+        return;
+      }
+
+      reconnectTimeoutRef.current = window.setTimeout(async () => {
+        reconnectTimeoutRef.current = null;
+
+        if (!isActive) {
+          return;
+        }
+
+        if (channelRef.current === failedChannel && failedChannel) {
+          channelRef.current = null;
+          await supabase.removeChannel(failedChannel);
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        await setupRealtime();
+      }, 3000);
+    }
 
     async function setupRealtime() {
       await supabase.realtime.setAuth(realtimeAccessToken);
@@ -147,9 +228,16 @@ export function AdminDashboard({
         return;
       }
 
-      currentChannel = supabase
+      const existingChannel = channelRef.current;
+
+      if (existingChannel) {
+        channelRef.current = null;
+        await supabase.removeChannel(existingChannel);
+      }
+
+      const nextChannel = supabase
         .channel("admin-messages-realtime", {
-          config: { presence: { key: managerRef.current?.id.toString() ?? "unknown" } },
+          config: { presence: { key: presenceKeyRef.current ?? "manager-presence" } },
         })
         .on(
           "postgres_changes",
@@ -177,45 +265,87 @@ export function AdminDashboard({
             });
           },
         )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "manager_statuses",
+          },
+          (payload: ManagerStatusRealtimePayload) => {
+            if (!isActive) {
+              return;
+            }
+
+            setManagerStatusOverrides((currentStatuses) => {
+              const nextStatuses = new Map(currentStatuses);
+              const managerId =
+                payload.eventType === "DELETE"
+                  ? payload.old.manager_id
+                  : payload.new.manager_id;
+
+              if (typeof managerId !== "number") {
+                return currentStatuses;
+              }
+
+              if (payload.eventType === "DELETE") {
+                nextStatuses.set(managerId, null);
+                return nextStatuses;
+              }
+
+              if (!isManagerAvailabilityStatus(payload.new.status)) {
+                return currentStatuses;
+              }
+
+              nextStatuses.set(managerId, payload.new.status);
+              return nextStatuses;
+            });
+          },
+        )
         .on("presence", { event: "sync" }, () => {
-          if (!isActive) return;
-          const state = currentChannel!.presenceState<Record<string, unknown>>();
-          console.log("[presence] sync, raw state:", JSON.stringify(state));
-          const map = new Map<number, string>();
+          if (!isActive) {
+            return;
+          }
+
+          const state = nextChannel.presenceState<Record<string, unknown>>();
+          const nextOnlineManagerIds = new Set<number>();
+
           for (const presences of Object.values(state)) {
-            for (const p of presences) {
-              if (typeof p.manager_id === "number") {
-                map.set(p.manager_id, typeof p.status === "string" ? p.status : "online");
+            for (const presence of presences) {
+              if (typeof presence.manager_id === "number") {
+                nextOnlineManagerIds.add(presence.manager_id);
               }
             }
           }
-          console.log("[presence] resolved map:", JSON.stringify(Object.fromEntries(map)));
-          setOnlineManagers(map);
-        })
-        .subscribe(async (subscribeStatus) => {
-          console.log("[channel] subscribe status:", subscribeStatus, "isActive:", isActive);
-          if ((subscribeStatus as string) === "SUBSCRIBED") {
-            isSubscribedRef.current = true;
-            const mgr = managerRef.current;
-            if (mgr) {
-              const savedStatus = window.localStorage.getItem("support-admin-status");
-              const currentStatus = savedStatus === "online" || savedStatus === "away" || savedStatus === "coffee"
-                ? savedStatus
-                : "online";
-              await currentChannel!.track({ manager_id: mgr.id, status: currentStatus });
-            }
-          } else if ((subscribeStatus as string) !== "SUBSCRIBING" && isActive) {
-            isSubscribedRef.current = false;
-            setTimeout(async () => {
-              if (!isActive) return;
-              await supabase.removeChannel(currentChannel!);
-              if (!isActive) return;
-              await setupRealtime();
-            }, 3000);
-          }
+
+          setOnlineManagerIds(nextOnlineManagerIds);
         });
 
-      channelRef.current = currentChannel;
+      channelRef.current = nextChannel;
+
+      nextChannel.subscribe(async (subscribeStatus) => {
+        if (!isActive || channelRef.current !== nextChannel) {
+          return;
+        }
+
+        if ((subscribeStatus as string) === "SUBSCRIBED") {
+          clearReconnectTimer();
+          isSubscribedRef.current = true;
+
+          const manager = managerRef.current;
+
+          if (manager) {
+            await nextChannel.track({ manager_id: manager.id });
+          }
+
+          return;
+        }
+
+        if ((subscribeStatus as string) !== "SUBSCRIBING") {
+          isSubscribedRef.current = false;
+          scheduleReconnect(nextChannel);
+        }
+      });
     }
 
     void setupRealtime();
@@ -223,12 +353,17 @@ export function AdminDashboard({
     return () => {
       isActive = false;
       isSubscribedRef.current = false;
+      clearReconnectTimer();
+      setOnlineManagerIds(new Set());
 
-      if (currentChannel) {
-        void supabase.removeChannel(currentChannel);
+      const activeChannel = channelRef.current;
+
+      if (activeChannel) {
+        channelRef.current = null;
+        void supabase.removeChannel(activeChannel);
       }
     };
-  }, [router, startRefresh, realtimeAccessToken]);
+  }, [realtimeAccessToken, router, startRefresh]);
 
   function handleLogout() {
     startLogout(async () => {
@@ -238,21 +373,52 @@ export function AdminDashboard({
     });
   }
 
-  function handleStatusChange(status: "online" | "away" | "coffee") {
-    setManagerStatus(status);
-    window.localStorage.setItem("support-admin-status", status);
-    const channel = channelRef.current;
+  function handleStatusChange(status: ManagerAvailabilityStatus) {
     const manager = managerRef.current;
-    console.log("[status] change to:", status, "subscribed:", isSubscribedRef.current, "hasManager:", !!manager, "hasChannel:", !!channel);
-    if (channel && manager && isSubscribedRef.current) {
-      channel.track({ manager_id: manager.id, status }).then(() => {
-        console.log("[status] track resolved:", status);
-      }).catch((err: unknown) => {
-        console.error("[status] track error:", err);
-      });
-    } else {
-      console.warn("[status] skipped track — subscribed:", isSubscribedRef.current, "manager:", !!manager, "channel:", !!channel);
+
+    if (!manager) {
+      return;
     }
+
+    const previousStatus = managerAvailabilityById.get(manager.id) ?? "online";
+
+    setManagerStatusOverrides((currentStatuses) => {
+      const nextStatuses = new Map(currentStatuses);
+      nextStatuses.set(manager.id, status);
+      return nextStatuses;
+    });
+
+    void fetch("/api/manager-status", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: boolean;
+          status?: { manager_id?: number; status?: string };
+        };
+        const nextStatus = payload.status?.status;
+
+        if (!response.ok || !payload.ok || !isManagerAvailabilityStatus(nextStatus)) {
+          throw new Error("Failed to update manager status");
+        }
+
+        setManagerStatusOverrides((currentStatuses) => {
+          const nextStatuses = new Map(currentStatuses);
+          nextStatuses.set(manager.id, nextStatus);
+          return nextStatuses;
+        });
+      })
+      .catch(() => {
+        setManagerStatusOverrides((currentStatuses) => {
+          const nextStatuses = new Map(currentStatuses);
+          nextStatuses.set(manager.id, previousStatus);
+          return nextStatuses;
+        });
+      });
   }
 
   return (
@@ -261,7 +427,7 @@ export function AdminDashboard({
         <DashboardHero
           currentManager={currentManager}
           managers={managers}
-          managerStatus={managerStatus}
+          managerStatus={currentManagerStatus}
           onStatusChange={handleStatusChange}
           totalMessages={initialMessages.length}
           totalChats={chatPreviews.length}
@@ -289,7 +455,7 @@ export function AdminDashboard({
                 assignmentFilter={assignmentFilter}
                 currentManager={currentManager}
                 managers={managers}
-                onlineManagers={onlineManagers}
+                managerStatuses={managerDisplayStatuses}
                 isTeamChatActive={isTeamChatActive}
                 teamMessages={teamMessages}
                 teamReadState={teamReadState}
@@ -310,7 +476,7 @@ export function AdminDashboard({
                 messages={isTeamChatActive ? [] : orderedVisibleMessages}
                 teamMessages={isTeamChatActive ? teamMessages : []}
                 isTeamChatActive={isTeamChatActive}
-                onlineManagers={onlineManagers}
+                managerStatuses={managerDisplayStatuses}
                 currentManager={currentManager}
                 managers={managers}
                 assignment={isTeamChatActive ? null : selectedAssignment}

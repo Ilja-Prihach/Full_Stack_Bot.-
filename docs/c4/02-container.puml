@@ -30,12 +30,15 @@ package "SupportBot Containers" as SupportBot {
     rectangle "Next.js page renderer\nsrc/app/page.tsx" as NextPage
     rectangle "Admin dashboard UI\nAdminDashboard + child components" as DashboardUi
     rectangle "Reply API route\n/api/clients/[clientId]/messages" as ReplyRoute
+    rectangle "Team message API routes\n/api/team-messages,\n/api/team-messages/read" as TeamChatRoutes
+    rectangle "Assignment + read API routes\n/api/clients/[clientId]/assignment,\n/api/clients/[clientId]/read" as DashboardStateRoutes
+    rectangle "Manager status API route\n/api/manager-status" as ManagerStatusRoute
     rectangle "Supabase JS clients\nSSR + browser realtime" as AdminSupabaseClient
   }
 
   package "Supabase Project" as SupabaseBoundary {
     rectangle "telegram-webhook\nDeno HTTP function" as Webhook
-    database "Postgres tables\nmessages, clients,\nmanagers, client_assignments" as MessagesDb
+    database "Postgres tables\nmessages, team_messages,\nmanager_statuses, read states,\nclients, managers, assignments" as MessagesDb
   }
 }
 
@@ -44,6 +47,9 @@ Browser -[hidden]-> NextPage
 NextPage -[hidden]-> AdminSupabaseClient
 AdminSupabaseClient -[hidden]-> MessagesDb
 DashboardUi -[hidden]-> ReplyRoute
+DashboardUi -[hidden]-> TeamChatRoutes
+DashboardUi -[hidden]-> DashboardStateRoutes
+DashboardUi -[hidden]-> ManagerStatusRoute
 MessagesDb -[hidden]-> Realtime
 Realtime -[hidden]-> Browser
 TelegramUser -[hidden]-> TelegramApi
@@ -54,11 +60,11 @@ NextPage -[hidden]-> DashboardUi
 SupportManager --> Browser : uses
 Browser --> NextPage : requests admin page
 NextPage --> AdminSupabaseClient : creates query client
-NextPage --> MessagesDb : selects messages,\nclients and managers
+NextPage --> MessagesDb : selects messages,\nteam messages, managers,\nmanager statuses, assignments,\nread states
 NextPage --> DashboardUi : passes initial data\nand auth token
 DashboardUi --> AdminSupabaseClient : subscribes to\nrealtime changes
 AdminSupabaseClient --> Realtime : opens authenticated\nWebSocket subscription
-Realtime --> DashboardUi : notifies about\nmessages changes
+Realtime --> DashboardUi : notifies about\nmessage, team chat,\nmanager status and presence changes
 
 TelegramUser --> TelegramApi : sends message
 TelegramApi --> Webhook : POST update\npayload
@@ -69,8 +75,17 @@ SupportManager --> DashboardUi : writes reply
 DashboardUi --> ReplyRoute : POST message text
 ReplyRoute --> TelegramApi : POST sendMessage
 ReplyRoute --> MessagesDb : inserts outgoing\nmanager message
+DashboardUi --> TeamChatRoutes : POST team message\nand team read state
+TeamChatRoutes --> MessagesDb : inserts team message\nor upserts team_read_states
+DashboardUi --> DashboardStateRoutes : POST assignment\nor client read state
+DashboardStateRoutes --> MessagesDb : upserts assignment\nor client_read_states
+DashboardUi --> ManagerStatusRoute : POST custom status
+ManagerStatusRoute --> MessagesDb : upserts manager_statuses
 
 AdminSupabaseClient --> MessagesDb : connects with\nmanager session / anon key
 ReplyRoute --> MessagesDb : connects with\nmanager session
+TeamChatRoutes --> MessagesDb : connects with\nmanager session
+DashboardStateRoutes --> MessagesDb : connects with\nmanager session
+ManagerStatusRoute --> MessagesDb : connects with\nmanager session
 
 @enduml

@@ -1,10 +1,23 @@
-import type { ChatPreview, ClientReadState, Message } from "./dashboard.types";
+import type { ChatPreview, ClientReadState, ManagerDisplayStatus, Message } from "./dashboard.types";
 
 export function formatTime(timestamp: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(timestamp));
+}
+
+export function getManagerStatusMeta(status: ManagerDisplayStatus) {
+  switch (status) {
+    case "away":
+      return { colorClassName: "bg-yellow-500", label: "Отошёл", showCoffeeIcon: false };
+    case "coffee":
+      return { colorClassName: "bg-amber-700", label: "Кофе-пауза", showCoffeeIcon: true };
+    case "online":
+      return { colorClassName: "bg-green-500", label: "В сети", showCoffeeIcon: false };
+    default:
+      return { colorClassName: "bg-gray-400", label: "Офлайн", showCoffeeIcon: false };
+  }
 }
 
 export function getDisplayName(message: Message) {
