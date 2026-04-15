@@ -1,0 +1,34 @@
+@startuml
+title Менеджер меняет статус доступности
+
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Менеджер" as manager
+participant "Admin UI" as ui
+participant "Support Admin API" as api
+database "public.managers" as managers
+database "public.manager_statuses" as manager_statuses
+participant "Supabase Realtime" as realtime
+participant "Другой менеджер" as other_manager
+
+manager -> ui : Выбирает статус\nonline / away / coffee
+ui -> ui : Оптимистично обновляет\nлокальный статус в header
+ui -> api : POST /api/manager-status\nstatus
+api -> managers : Определяет текущего менеджера\nпо auth session
+managers --> api : Менеджер найден
+api -> manager_statuses : UPSERT\nmanager_id, status, updated_at
+manager_statuses --> api : Статус сохранён
+api --> ui : 200 OK с сохранённым статусом
+
+manager_statuses -> realtime : WAL change event
+realtime -> ui : postgres_changes event\n(table = manager_statuses)
+ui -> ui : Обновляет единый источник\nстатуса для header и popover
+
+ui -> realtime : presence track\nmanager_id
+realtime -> other_manager : presence sync +\nmanager_statuses change
+other_manager -> other_manager : Собирает display status:\nonline/offline из presence\n+ away/coffee из table
+
+@enduml

@@ -11,6 +11,7 @@ participant "Admin UI" as ui
 participant "Support Admin API" as api
 database "public.managers" as managers
 database "public.team_messages" as team_messages
+database "public.team_read_states" as team_read_states
 participant "Supabase Realtime" as realtime
 participant "Другой менеджер" as other_manager
 
@@ -30,7 +31,7 @@ realtime -> other_manager : postgres_changes event\nчерез WebSocket
 other_manager -> other_manager : Обновляет unread count\nв сайдбаре
 
 ui -> api : POST /api/team-messages/read\nmessageId = last message id
-api -> team_messages : UPSERT team_read_states\nmanager_id, last_read_message_id
+api -> team_read_states : UPSERT\nmanager_id, last_read_message_id,\nupdated_at
 api --> ui : 200 OK
 ui -> ui : router.refresh()\nсбрасывает unread badge
 

@@ -98,6 +98,14 @@ entity "public.team_read_states" as team_read_states {
   * updated_at : timestamptz = now()
 }
 
+entity "public.manager_statuses" as manager_statuses {
+  * manager_id : bigint <<PK, FK>>
+  --
+  * status : text
+  * updated_at : timestamptz = now()
+  <<CHECK status IN ('online', 'away', 'coffee')>>
+}
+
 auth_users ||--o{ managers : "auth user"
 clients ||--|| client_assignments : "assignment"
 clients ||--o{ messages : "messages"
@@ -109,6 +117,7 @@ managers ||--o{ messages : "manager sender"
 managers ||--o{ client_read_states : "read by manager"
 managers ||--o{ team_messages : "sender"
 managers ||--o{ team_read_states : "read state"
+managers ||--|| manager_statuses : "custom status"
 
 note right of messages
   Client support messages.
@@ -136,6 +145,15 @@ note right of team_read_states
   Tracks last read team message
   per manager.
   One row per manager.
+end note
+
+note right of manager_statuses
+  Stores custom manager
+  availability state:
+  online / away / coffee.
+  Presence is used separately
+  for online/offline tracking.
+  Realtime publication enabled.
 end note
 
 @enduml

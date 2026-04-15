@@ -34,6 +34,16 @@ export type ManagerProfile = {
   position: string;
 };
 
+export type ManagerAvailabilityStatus = "online" | "away" | "coffee";
+
+export type ManagerDisplayStatus = "offline" | ManagerAvailabilityStatus;
+
+export type ManagerStatusRecord = {
+  manager_id: number;
+  status: ManagerAvailabilityStatus;
+  updated_at: string;
+};
+
 export type ClientAssignment = {
   client_id: number;
   assigned_manager_id: number | null;
@@ -76,6 +86,7 @@ export type AdminDashboardProps = {
   errorMessage: string | null;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
+  managerStatuses: ManagerStatusRecord[];
   assignments: ClientAssignment[];
   readStates: ClientReadState[];
   realtimeAccessToken: string;

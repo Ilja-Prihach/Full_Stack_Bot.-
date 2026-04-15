@@ -23,17 +23,21 @@ actor "Support Manager" as SupportManager
 rectangle "Browser" as Browser
 rectangle "Telegram Bot API" as TelegramApi
 rectangle "Supabase Realtime\nWebSocket" as Realtime
-database "Supabase Postgres\nmessages, clients,\nmanagers, client_assignments" as MessagesDb
+database "Supabase Postgres\nmessages, team_messages,\nmanager_statuses, read states,\nclients, managers, assignments" as MessagesDb
 
 package "support-admin" as SupportAdmin {
   rectangle "page.tsx\nSSR entrypoint" as Page
   rectangle "supabase.ts\nSSR client + browser realtime" as FrontSupabase
-  rectangle "AdminDashboard\nsearch, selection,\nrealtime refresh, theme" as AdminDashboard
+  rectangle "AdminDashboard\nsearch, selection,\nrealtime refresh,\npresence + status merge,\ntheme" as AdminDashboard
   rectangle "dashboard-shared\nformat helpers,\nchat previews, types" as DashboardShared
-  rectangle "DashboardHero\nsummary header" as DashboardHero
-  rectangle "ChatSidebar\nchat list, search,\nmanual refresh" as ChatSidebar
-  rectangle "MessagePanel\ndialog transcript,\ncomposer, send on Enter" as MessagePanel
+  rectangle "DashboardHero\nsummary header\nand status picker" as DashboardHero
+  rectangle "ChatSidebar\nchat list, search,\nmanager status list" as ChatSidebar
+  rectangle "MessagePanel\ndialog transcript,\nassignment, composer,\nread tracking" as MessagePanel
   rectangle "reply route\n/api/clients/[clientId]/messages" as ReplyRoute
+  rectangle "assignment route\n/api/clients/[clientId]/assignment" as AssignmentRoute
+  rectangle "client read route\n/api/clients/[clientId]/read" as ClientReadRoute
+  rectangle "team chat routes\n/api/team-messages,\n/api/team-messages/read" as TeamChatRoutes
+  rectangle "manager status route\n/api/manager-status" as ManagerStatusRoute
 }
 
 package "telegram-webhook" as TelegramWebhook {
@@ -56,6 +60,10 @@ AdminDashboard -[hidden]-> MessagePanel
 ChatSidebar -[hidden]-> DashboardShared
 MessagePanel -[hidden]-> DashboardShared
 MessagePanel -[hidden]-> ReplyRoute
+MessagePanel -[hidden]-> AssignmentRoute
+MessagePanel -[hidden]-> ClientReadRoute
+MessagePanel -[hidden]-> TeamChatRoutes
+DashboardHero -[hidden]-> ManagerStatusRoute
 TelegramApi -[hidden]-> WebhookIndex
 WebhookIndex -[hidden]-> WebhookHandlers
 WebhookHandlers -[hidden]-> WebhookMessages
@@ -65,22 +73,29 @@ WebhookConfig -[hidden]-> WebhookTelegram
 SupportManager --> Browser : uses
 Browser --> Page : requests /
 Page --> FrontSupabase : imports client
-Page --> MessagesDb : selects messages,\nclients and managers
-Page --> AdminDashboard : passes initial data,\nmanager profile and access token
+Page --> MessagesDb : selects messages,\nteam messages, managers,\nmanager_statuses, assignments,\nread states
+Page --> AdminDashboard : passes initial data,\nmanager profile, statuses\nand access token
 
 AdminDashboard --> DashboardHero : renders stats
 AdminDashboard --> ChatSidebar : renders chat navigation
 AdminDashboard --> MessagePanel : renders selected chat
 AdminDashboard --> DashboardShared : preview and\nlabel helpers
-AdminDashboard --> FrontSupabase : opens realtime\nmessages subscription
+AdminDashboard --> FrontSupabase : opens realtime\nmessages, team messages,\nmanager_statuses and\npresence subscription
 FrontSupabase --> Realtime : authenticated WebSocket
-Realtime --> AdminDashboard : messages change event
-ChatSidebar --> DashboardShared : formatTime
+Realtime --> AdminDashboard : postgres_changes and\npresence sync events
+ChatSidebar --> DashboardShared : formatTime and\nstatus metadata
 MessagePanel --> DashboardShared : format and\nlabel helpers
-ChatSidebar --> Page : triggers manual\nrouter.refresh
 MessagePanel --> ReplyRoute : POST reply text
+MessagePanel --> AssignmentRoute : POST assigned manager
+MessagePanel --> ClientReadRoute : POST last read client message
+MessagePanel --> TeamChatRoutes : POST team message\nand team read state
+DashboardHero --> ManagerStatusRoute : POST availability status
 ReplyRoute --> TelegramApi : POST /sendMessage
 ReplyRoute --> MessagesDb : insert manager message
+AssignmentRoute --> MessagesDb : upsert client_assignments
+ClientReadRoute --> MessagesDb : upsert client_read_states
+TeamChatRoutes --> MessagesDb : insert team_messages\nand upsert team_read_states
+ManagerStatusRoute --> MessagesDb : upsert manager_statuses
 
 TelegramApi --> WebhookIndex : POST update
 WebhookIndex --> WebhookTelegram : extractTelegramMessage(update)

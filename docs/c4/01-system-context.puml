@@ -27,8 +27,9 @@ rectangle "Supabase Realtime\nWebSocket" as SupabaseRealtime
 package "SupportBot" as SupportBot {
   rectangle "support-admin\nNext.js admin dashboard" as SupportAdmin
   rectangle "admin reply API\n/api/clients/{id}/messages" as ReplyApi
+  rectangle "manager status API\n/api/manager-status" as ManagerStatusApi
   rectangle "telegram-webhook\nSupabase Edge Function" as TelegramWebhook
-  database "Supabase Postgres\nmessages, clients,\nmanagers, client_assignments" as MessagesDb
+  database "Supabase Postgres\nmessages, team_messages,\nmanager_statuses, read states,\nclients, managers, assignments" as MessagesDb
 }
 
 rectangle "Supabase Platform" as SupabasePlatform
@@ -48,9 +49,11 @@ TelegramWebhook --> TelegramApi : sends conditional\nacknowledgement
 
 SupportManager --> SupportAdmin : opens dashboard
 SupportManager --> ReplyApi : sends reply\nthrough admin UI
+SupportManager --> ManagerStatusApi : updates custom\navailability status
 SupportAdmin --> MessagesDb : reads dialogs\nand manager data
 ReplyApi --> TelegramApi : sends manager\nmessage
 ReplyApi --> MessagesDb : stores outgoing\nmanager message
+ManagerStatusApi --> MessagesDb : upserts manager\navailability status
 MessagesDb --> SupabaseRealtime : emits table\nchange events
 SupabaseRealtime --> SupportAdmin : pushes realtime\nupdates over WebSocket
 
@@ -58,5 +61,6 @@ TelegramWebhook --> SupabasePlatform : deployed on
 MessagesDb --> SupabasePlatform : hosted by
 SupportAdmin --> SupabasePlatform : uses project URL,\nauth session and realtime
 ReplyApi --> SupabasePlatform : uses project URL\nand manager session
+ManagerStatusApi --> SupabasePlatform : uses project URL\nand manager session
 
 @enduml

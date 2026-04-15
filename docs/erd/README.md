@@ -4,7 +4,7 @@ This folder contains ERD diagrams derived from `supabase/migrations`.
 
 Files:
 
-- `01-supabase-schema.puml` - current database schema including client messages, team chat, read states, and assignments
+- `01-supabase-schema.puml` - current database schema including client messages, team chat, read states, assignments, and manager availability statuses
 
 Source migrations:
 
@@ -15,3 +15,4 @@ Source migrations:
 - `supabase/migrations/20260412120000_create_client_read_states.sql`
 - `supabase/migrations/20260414120000_create_team_messages.sql`
 - `supabase/migrations/20260414120100_create_team_read_states.sql`
+- `supabase/migrations/20260415100000_create_manager_statuses.sql`
