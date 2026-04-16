@@ -28,6 +28,13 @@ function formatManagerName(manager: ManagerProfile) {
   return `${manager.first_name} ${manager.last_name}`.trim();
 }
 
+function getTeamMessageSenderName(message: TeamMessage, managers: ManagerProfile[]) {
+  const manager = managers.find((item) => Number(item.id) === Number(message.sender_id)) ?? null;
+  const computedName = [manager?.first_name, manager?.position].filter(Boolean).join(" · ");
+
+  return computedName || message.sender_name || "Менеджер";
+}
+
 export function MessagePanel({
   selectedChat,
   messages,
@@ -44,6 +51,7 @@ export function MessagePanel({
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [isSending, startSending] = useTransition();
   const [isAssigning, startAssigning] = useTransition();
 
@@ -68,6 +76,16 @@ export function MessagePanel({
     [...messages]
       .reverse()
       .find((message) => message.sender_type === "client")?.id ?? null;
+
+  useEffect(() => {
+    const hydrationFrame = window.requestAnimationFrame(() => {
+      setIsHydrated(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(hydrationFrame);
+    };
+  }, []);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -351,7 +369,9 @@ export function MessagePanel({
                               className={`inline-block h-2 w-2 rounded-full ${senderStatusMeta.colorClassName}`}
                             />
                             <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5 text-[11px] inline-block`}>
-                              {message.sender_name}
+                              {isHydrated
+                                ? getTeamMessageSenderName(message, managers)
+                                : (message.sender_name || "Менеджер")}
                             </span>
                             {senderStatus === "away" && (
                               <span className="text-[10px] text-yellow-600">отошёл</span>

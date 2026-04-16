@@ -23,6 +23,19 @@ type RawMessage = Omit<Message, "client"> & {
     : never;
 };
 
+type RawManager = Omit<ManagerProfile, "id"> & {
+  id: number | string;
+};
+
+type RawManagerStatus = Omit<ManagerStatusRecord, "manager_id"> & {
+  manager_id: number | string;
+};
+
+type RawTeamMessage = Omit<TeamMessage, "id" | "sender_id" | "sender_name"> & {
+  id: number | string;
+  sender_id: number | string;
+};
+
 export default async function Home() {
   const cookieStore = await cookies();
   const { accessToken } = getSupabaseSessionCookies(cookieStore);
@@ -102,11 +115,7 @@ export default async function Home() {
             id,
             sender_id,
             text,
-            created_at,
-            managers (
-              first_name,
-              last_name
-            )
+            created_at
           `,
         )
         .order("created_at", { ascending: true }),
@@ -116,8 +125,14 @@ export default async function Home() {
     ...message,
     client: message.client[0] ?? null,
   }));
-  const managers = (managersData ?? []) as ManagerProfile[];
-  const managerStatuses = (managerStatusesData ?? []) as ManagerStatusRecord[];
+  const managers: ManagerProfile[] = ((managersData ?? []) as RawManager[]).map((manager) => ({
+    ...manager,
+    id: Number(manager.id),
+  }));
+  const managerStatuses: ManagerStatusRecord[] = ((managerStatusesData ?? []) as RawManagerStatus[]).map((status) => ({
+    ...status,
+    manager_id: Number(status.manager_id),
+  }));
   const assignments = (assignmentsData ?? []) as ClientAssignment[];
   const currentManager =
     managers.find((manager) => manager.auth_user_id === userData.user?.id) ?? null;
@@ -137,24 +152,21 @@ export default async function Home() {
       ).data ?? []) as ClientReadState[])
     : [];
 
-  // Supabase при JOIN возвращает managers как массив.
-  // Берём первый элемент и собираем "Имя Фамилия" в sender_name.
-  // Если менеджера вдруг нет — фолбэк "Менеджер".
-  const teamMessages: TeamMessage[] = ((teamMessagesData ?? []) as Array<{
-    id: number;
-    sender_id: number;
-    text: string;
-    created_at: string;
-    managers: Array<{ first_name: string; last_name: string }>;
-  }>).map((msg) => ({
-    id: msg.id,
-    sender_id: msg.sender_id,
-    sender_name: msg.managers?.[0]
-      ? `${msg.managers[0].first_name} ${msg.managers[0].last_name}`
-      : "Менеджер",
-    text: msg.text,
-    created_at: msg.created_at,
-  }));
+  // Для team chat отображаем отправителя по уже загруженному списку managers.
+  // Это надёжнее, чем полагаться на embedded relation в select team_messages.
+  const teamMessages: TeamMessage[] = ((teamMessagesData ?? []) as RawTeamMessage[]).map((msg) => {
+    const senderId = Number(msg.sender_id);
+    const manager = managers.find((item) => item.id === senderId) ?? null;
+    const senderName = [manager?.first_name, manager?.position].filter(Boolean).join(" · ");
+
+    return {
+      id: Number(msg.id),
+      sender_id: senderId,
+      sender_name: senderName || "Менеджер",
+      text: msg.text,
+      created_at: msg.created_at,
+    };
+  });
 
   // Фетчим last_read_message_id для текущего менеджера.
   // Одна строка — используется для подсчёта непрочитанных в сайдбаре.

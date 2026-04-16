@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type {
   ChatAssignmentFilter,
   ChatPreview,
@@ -79,8 +79,13 @@ export function ChatSidebar({
   onSelectTeamChat,
 }: ChatSidebarProps) {
   const filterMenuRef = useRef<HTMLDetailsElement | null>(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
+    const hydrationFrame = window.requestAnimationFrame(() => {
+      setIsHydrated(true);
+    });
+
     function handlePointerDown(event: PointerEvent) {
       const filterMenu = filterMenuRef.current;
 
@@ -103,6 +108,7 @@ export function ChatSidebar({
     document.addEventListener("keydown", handleKeyDown);
 
     return () => {
+      window.cancelAnimationFrame(hydrationFrame);
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
@@ -114,6 +120,17 @@ export function ChatSidebar({
     if (filterMenuRef.current) {
       filterMenuRef.current.open = false;
     }
+  }
+
+  function getTeamMessageSenderName(message: TeamMessage) {
+    if (!isHydrated) {
+      return message.sender_name || "Менеджер";
+    }
+
+    const manager = managers.find((item) => Number(item.id) === Number(message.sender_id)) ?? null;
+    const computedName = [manager?.first_name, manager?.position].filter(Boolean).join(" · ");
+
+    return computedName || message.sender_name || "Менеджер";
   }
 
   return (
@@ -234,7 +251,7 @@ export function ChatSidebar({
             </div>
             {teamMessages.length > 0 && (
               <div className="mt-2 truncate text-sm">
-                {teamMessages[teamMessages.length - 1].sender_name}: {teamMessages[teamMessages.length - 1].text}
+                {getTeamMessageSenderName(teamMessages[teamMessages.length - 1])}: {teamMessages[teamMessages.length - 1].text}
               </div>
             )}
           </button>
