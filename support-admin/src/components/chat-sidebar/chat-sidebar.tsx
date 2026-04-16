@@ -310,7 +310,7 @@ export function ChatSidebar({
             </div>
           </details>
 
-          <details open className="group">
+          <details className="group">
             <summary
               className={`${styles.chatButton} w-full min-w-0 max-w-full cursor-pointer list-none overflow-hidden rounded-[22px] border px-4 py-3 text-left transition sm:rounded-[24px] sm:py-4`}
             >

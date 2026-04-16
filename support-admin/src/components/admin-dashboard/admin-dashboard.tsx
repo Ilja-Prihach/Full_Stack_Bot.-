@@ -47,7 +47,7 @@ export function AdminDashboard({
   const [isLoggingOut, startLogout] = useTransition();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [isTeamChatActive, setIsTeamChatActive] = useState(false);
+  const [isTeamChatActive, setIsTeamChatActive] = useState(true);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
   const [managerStatusOverrides, setManagerStatusOverrides] = useState(
     () => new Map<number, ManagerAvailabilityStatus | null>(),
