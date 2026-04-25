@@ -406,15 +406,21 @@ export function MessagePanel({
               ) : (
                 messages.map((message) => {
                   const isManagerMessage = message.sender_type === "manager";
+                  const isAiBotMessage = message.sender_type === "ai_bot";
+                  const badgeLabel = isManagerMessage
+                    ? "Менеджер"
+                    : isAiBotMessage
+                      ? "ИИ Ассистент"
+                      : "Клиент";
 
                   return (
                     <article
                       key={message.id}
-                      className={`flex ${isManagerMessage ? "justify-end" : "justify-start"}`}
+                      className={`flex ${(isManagerMessage || isAiBotMessage) ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`${styles.messageBubble} ${
-                          isManagerMessage
+                          isManagerMessage || isAiBotMessage
                             ? styles.messageBubbleOutgoing
                             : styles.messageBubbleIncoming
                         } max-w-[88%] rounded-[20px] px-3 py-3 sm:max-w-[72%] sm:px-4 sm:py-3.5`}
@@ -425,7 +431,7 @@ export function MessagePanel({
 
                         <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
                           <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5`}>
-                            {isManagerMessage ? "Менеджер" : "Клиент"}
+                            {badgeLabel}
                           </span>
                           <span className={styles.muted}>{formatTime(message.created_at)}</span>
                         </div>

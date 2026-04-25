@@ -1,7 +1,7 @@
 export type Message = {
   id: string | number;
   client_id: number;
-  sender_type: "client" | "manager";
+  sender_type: "client" | "manager" | "ai_bot";
   sender_label: string;
   text: string;
   created_at: string;

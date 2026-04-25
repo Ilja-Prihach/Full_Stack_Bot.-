@@ -25,6 +25,10 @@ export function getDisplayName(message: Message) {
     return message.sender_label || "Менеджер";
   }
 
+  if (message.sender_type === "ai_bot") {
+    return message.sender_label || "ИИ Ассистент";
+  }
+
   const fullName = [message.client?.first_name, message.client?.last_name]
     .filter(Boolean)
     .join(" ");
@@ -35,6 +39,10 @@ export function getDisplayName(message: Message) {
 export function getUsernameLabel(message: Message) {
   if (message.sender_type === "manager") {
     return "менеджер";
+  }
+
+  if (message.sender_type === "ai_bot") {
+    return "автоответ";
   }
 
   return message.client?.username ? `@${message.client.username}` : "";
