@@ -18,6 +18,8 @@ type IncomingTelegramMessage = {
 type SaveIncomingMessageResult = {
   error: { message: string } | null;
   shouldSendAutoReply: boolean;
+  clientId: number | null;
+  messageId: number | null;
 };
 
 export function hasSupabaseConfig() {
@@ -119,16 +121,38 @@ export async function saveIncomingMessage(
   const client = await findOrCreateClient(message);
   const shouldSendAutoReply = !(await hasManagerReply(client.id));
 
-  const { error } = await supabase.from("messages").insert({
-    client_id: client.id,
-    sender_type: "client",
-    sender_manager_id: null,
-    sender_label: getSenderLabel(message),
-    text: message.text,
-  });
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({
+      client_id: client.id,
+      sender_type: "client",
+      sender_manager_id: null,
+      sender_label: getSenderLabel(message),
+      text: message.text,
+    })
+    .select("id")
+    .single();
 
   return {
     error,
     shouldSendAutoReply,
+    clientId: client.id ?? null,
+    messageId: data?.id ?? null,
   };
+}
+
+export async function saveAiBotMessage(clientId: number, text: string) {
+  if (!supabase) {
+    throw new Error("Supabase client is not configured");
+  }
+
+  const { error } = await supabase.from("messages").insert({
+    client_id: clientId,
+    sender_type: "ai_bot",
+    sender_manager_id: null,
+    sender_label: "ИИ Ассистент",
+    text,
+  });
+
+  return { error };
 }
