@@ -15,6 +15,8 @@ type DashboardHeroProps = {
   onToggleTheme: () => void;
   onLogout: () => void;
   isLoggingOut: boolean;
+  isKnowledgeBaseActive: boolean;
+  onToggleKnowledgeBase: () => void;
 };
 
 function formatManagerName(manager: Pick<ManagerProfile, "first_name" | "last_name" | "email">) {
@@ -57,6 +59,8 @@ export function DashboardHero({
   onToggleTheme,
   onLogout,
   isLoggingOut,
+  isKnowledgeBaseActive,
+  onToggleKnowledgeBase,
 }: DashboardHeroProps) {
   const managerMenuRef = useRef<HTMLDetailsElement | null>(null);
 
@@ -212,6 +216,14 @@ export function DashboardHero({
               </div>
             </div>
           </details>
+
+          <button
+            type="button"
+            onClick={onToggleKnowledgeBase}
+            className="rounded-full bg-white/12 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/18"
+          >
+            {isKnowledgeBaseActive ? "К чатам" : "База знаний"}
+          </button>
 
           <button
             type="button"
