@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 type KbCategory = {
   id: number;
@@ -34,10 +41,20 @@ type EntriesResponse = {
   error?: string;
 };
 
+function parseKeywords(value: string) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export function KnowledgeBase() {
   const [categories, setCategories] = useState<KbCategory[]>([]);
   const [entries, setEntries] = useState<KbEntry[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   const [categoryName, setCategoryName] = useState("");
   const [categoryDescription, setCategoryDescription] = useState("");
@@ -65,6 +82,11 @@ export function KnowledgeBase() {
   const [isDeletingCategory, startDeletingCategory] = useTransition();
   const [isUpdatingEntry, startUpdatingEntry] = useTransition();
   const [isDeletingEntry, startDeletingEntry] = useTransition();
+
+  const deferredSearchQuery = useDeferredValue(searchQuery);
+  const normalizedSearchQuery = deferredSearchQuery.trim().toLowerCase();
+  const categoryEditFormRef = useRef<HTMLFormElement | null>(null);
+  const entryEditFormRef = useRef<HTMLFormElement | null>(null);
 
   useEffect(() => {
     startLoading(async () => {
@@ -94,12 +116,32 @@ export function KnowledgeBase() {
     });
   }, []);
 
-  function parseKeywords(value: string) {
-    return value
-      .split(",")
-      .map((item) => item.trim())
-      .filter(Boolean);
-  }
+  const categoryNameById = useMemo(
+    () => new Map(categories.map((category) => [category.id, category.name])),
+    [categories],
+  );
+
+  const filteredEntries = useMemo(() => {
+    return entries.filter((entry) => {
+      if (categoryFilter && entry.category_id !== Number(categoryFilter)) {
+        return false;
+      }
+
+      if (!normalizedSearchQuery) {
+        return true;
+      }
+
+      const categoryName =
+        entry.category_id != null ? (categoryNameById.get(entry.category_id) ?? "") : "";
+
+      return (
+        entry.question.toLowerCase().includes(normalizedSearchQuery) ||
+        entry.answer.toLowerCase().includes(normalizedSearchQuery) ||
+        entry.keywords.some((keyword) => keyword.toLowerCase().includes(normalizedSearchQuery)) ||
+        categoryName.toLowerCase().includes(normalizedSearchQuery)
+      );
+    });
+  }, [categoryFilter, categoryNameById, entries, normalizedSearchQuery]);
 
   function startCategoryEdit(category: KbCategory) {
     setEditingCategoryId(category.id);
@@ -131,6 +173,117 @@ export function KnowledgeBase() {
     setEditingIsActive(true);
   }
 
+  async function submitCategoryUpdate() {
+    if (!editingCategoryId || !editingCategoryName.trim()) {
+      return;
+    }
+
+    const response = await fetch(`/api/kb/categories/${editingCategoryId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: editingCategoryName,
+        description: editingCategoryDescription || null,
+      }),
+    });
+
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      category?: KbCategory;
+      error?: string;
+    };
+
+    if (!response.ok || payload.ok === false || !payload.category) {
+      setErrorMessage(payload.error ?? "Не удалось обновить категорию");
+      return;
+    }
+
+    setCategories((current) =>
+      current
+        .map((item) => (item.id === payload.category!.id ? payload.category! : item))
+        .sort((left, right) => left.name.localeCompare(right.name)),
+    );
+    resetCategoryEdit();
+    setErrorMessage(null);
+  }
+
+  async function submitEntryUpdate() {
+    if (!editingEntryId || !editingQuestion.trim() || !editingAnswer.trim()) {
+      return;
+    }
+
+    const response = await fetch(`/api/kb/entries/${editingEntryId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        categoryId: editingEntryCategoryId ? Number(editingEntryCategoryId) : null,
+        question: editingQuestion,
+        answer: editingAnswer,
+        keywords: parseKeywords(editingKeywords),
+        isActive: editingIsActive,
+      }),
+    });
+
+    const payload = (await response.json()) as {
+      ok?: boolean;
+      entry?: KbEntry;
+      error?: string;
+    };
+
+    if (!response.ok || payload.ok === false || !payload.entry) {
+      setErrorMessage(payload.error ?? "Не удалось обновить статью");
+      return;
+    }
+
+    setEntries((current) =>
+      current.map((item) => (item.id === payload.entry!.id ? payload.entry! : item)),
+    );
+    resetEntryEdit();
+    setErrorMessage(null);
+  }
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target;
+
+      if (!(target instanceof Node)) {
+        return;
+      }
+
+      if (editingCategoryId && categoryEditFormRef.current && !categoryEditFormRef.current.contains(target)) {
+        startUpdatingCategory(async () => {
+          await submitCategoryUpdate();
+        });
+      }
+
+      if (editingEntryId && entryEditFormRef.current && !entryEditFormRef.current.contains(target)) {
+        startUpdatingEntry(async () => {
+          await submitEntryUpdate();
+        });
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+    };
+  }, [
+    editingCategoryDescription,
+    editingCategoryId,
+    editingCategoryName,
+    editingEntryCategoryId,
+    editingEntryId,
+    editingAnswer,
+    editingIsActive,
+    editingKeywords,
+    editingQuestion,
+  ]);
+
   function handleCreateCategory(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -158,7 +311,7 @@ export function KnowledgeBase() {
       }
 
       setCategories((current) =>
-        [...current, payload.category!].sort((a, b) => a.name.localeCompare(b.name)),
+        [...current, payload.category!].sort((left, right) => left.name.localeCompare(right.name)),
       );
       setCategoryName("");
       setCategoryDescription("");
@@ -206,48 +359,13 @@ export function KnowledgeBase() {
 
   function handleUpdateCategory(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!editingCategoryId) {
-      return;
-    }
-
     startUpdatingCategory(async () => {
-      const response = await fetch(`/api/kb/categories/${editingCategoryId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: editingCategoryName,
-          description: editingCategoryDescription || null,
-        }),
-      });
-
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        category?: KbCategory;
-        error?: string;
-      };
-
-      if (!response.ok || payload.ok === false || !payload.category) {
-        setErrorMessage(payload.error ?? "Не удалось обновить категорию");
-        return;
-      }
-
-      setCategories((current) =>
-        current
-          .map((item) => (item.id === payload.category!.id ? payload.category! : item))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      );
-      resetCategoryEdit();
-      setErrorMessage(null);
+      await submitCategoryUpdate();
     });
   }
 
   function handleDeleteCategory(categoryId: number) {
-    const confirmed = window.confirm("Удалить категорию?");
-
-    if (!confirmed) {
+    if (!window.confirm("Удалить категорию?")) {
       return;
     }
 
@@ -274,55 +392,23 @@ export function KnowledgeBase() {
         resetCategoryEdit();
       }
 
+      if (categoryFilter === String(categoryId)) {
+        setCategoryFilter("");
+      }
+
       setErrorMessage(null);
     });
   }
 
   function handleUpdateEntry(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-
-    if (!editingEntryId) {
-      return;
-    }
-
     startUpdatingEntry(async () => {
-      const response = await fetch(`/api/kb/entries/${editingEntryId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          categoryId: editingEntryCategoryId ? Number(editingEntryCategoryId) : null,
-          question: editingQuestion,
-          answer: editingAnswer,
-          keywords: parseKeywords(editingKeywords),
-          isActive: editingIsActive,
-        }),
-      });
-
-      const payload = (await response.json()) as {
-        ok?: boolean;
-        entry?: KbEntry;
-        error?: string;
-      };
-
-      if (!response.ok || payload.ok === false || !payload.entry) {
-        setErrorMessage(payload.error ?? "Не удалось обновить статью");
-        return;
-      }
-
-      setEntries((current) =>
-        current.map((item) => (item.id === payload.entry!.id ? payload.entry! : item)),
-      );
-      resetEntryEdit();
-      setErrorMessage(null);
+      await submitEntryUpdate();
     });
   }
 
   function handleDeleteEntry(entryId: number) {
-    const confirmed = window.confirm("Удалить статью?");
-
-    if (!confirmed) {
+    if (!window.confirm("Удалить статью?")) {
       return;
     }
 
@@ -349,25 +435,28 @@ export function KnowledgeBase() {
   }
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+    <div className="grid gap-4 lg:h-full lg:min-h-0 lg:grid-cols-[320px_minmax(0,1fr)]">
       <aside
-        className="rounded-[24px] border p-4"
+        className="flex min-h-0 flex-col rounded-[24px] border p-4"
         style={{ background: "var(--panel)", borderColor: "var(--line)" }}
       >
-        <div className="text-sm font-semibold">Категории</div>
+        <div className="shrink-0">
+          <div className="text-sm font-semibold">Категории</div>
+          <div className="mt-1 text-xs text-slate-500">{categories.length} категорий</div>
+        </div>
 
-        <div className="mt-3 space-y-2">
+        <div className="mt-4 min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
           {categories.length === 0 ? (
             <div className="text-sm text-slate-500">Категорий пока нет</div>
           ) : (
             categories.map((category) => (
               <div
                 key={category.id}
-                className="rounded-2xl border px-3 py-2"
+                className="rounded-2xl border px-3 py-3"
                 style={{ borderColor: "var(--line)" }}
               >
                 {editingCategoryId === category.id ? (
-                  <form onSubmit={handleUpdateCategory} className="space-y-2">
+                  <form ref={categoryEditFormRef} onSubmit={handleUpdateCategory} className="space-y-2">
                     <input
                       value={editingCategoryName}
                       onChange={(event) => setEditingCategoryName(event.target.value)}
@@ -430,240 +519,274 @@ export function KnowledgeBase() {
           )}
         </div>
 
-        <form onSubmit={handleCreateCategory} className="mt-4 space-y-3">
-          <div className="text-sm font-semibold">Новая категория</div>
+        <details className="mt-4 shrink-0 border-t pt-4" style={{ borderColor: "var(--line)" }}>
+          <summary className="cursor-pointer text-sm font-semibold">Новая категория</summary>
 
-          <input
-            value={categoryName}
-            onChange={(event) => setCategoryName(event.target.value)}
-            placeholder="Название категории"
-            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "var(--line)", background: "var(--input)" }}
-          />
+          <form onSubmit={handleCreateCategory} className="mt-3 space-y-2">
+            <input
+              value={categoryName}
+              onChange={(event) => setCategoryName(event.target.value)}
+              placeholder="Название категории"
+              className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+              style={{ borderColor: "var(--line)", background: "var(--input)" }}
+            />
 
-          <textarea
-            value={categoryDescription}
-            onChange={(event) => setCategoryDescription(event.target.value)}
-            placeholder="Описание категории"
-            rows={3}
-            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "var(--line)", background: "var(--input)" }}
-          />
+            <textarea
+              value={categoryDescription}
+              onChange={(event) => setCategoryDescription(event.target.value)}
+              placeholder="Описание категории"
+              rows={2}
+              className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+              style={{ borderColor: "var(--line)", background: "var(--input)" }}
+            />
 
-          <button
-            type="submit"
-            disabled={!categoryName.trim() || isSavingCategory}
-            className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {isSavingCategory ? "Создание..." : "Добавить категорию"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={!categoryName.trim() || isSavingCategory}
+              className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            >
+              {isSavingCategory ? "Создание..." : "Добавить категорию"}
+            </button>
+          </form>
+        </details>
       </aside>
 
       <section
-        className="rounded-[24px] border p-4"
+        className="flex min-h-0 flex-col rounded-[24px] border p-4"
         style={{ background: "var(--panel)", borderColor: "var(--line)" }}
       >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-lg font-semibold">База знаний</div>
-            <div className="text-sm text-slate-500">
-              {isLoading ? "Загрузка..." : `Статей: ${entries.length}`}
+        <div className="shrink-0">
+          <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+            <div>
+              <div className="text-lg font-semibold">База знаний</div>
+              <div className="text-sm text-slate-500">
+                {isLoading ? "Загрузка..." : `Показано статей: ${filteredEntries.length} из ${entries.length}`}
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px] xl:w-[520px]">
+              <input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Поиск по вопросам, ответам, ключевым словам"
+                className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: "var(--line)", background: "var(--input)" }}
+              />
+
+              <select
+                value={categoryFilter}
+                onChange={(event) => setCategoryFilter(event.target.value)}
+                className="rounded-2xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: "var(--line)", background: "var(--input)" }}
+              >
+                <option value="">Все категории</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
+
+          {errorMessage ? (
+            <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMessage}
+            </div>
+          ) : null}
+
+          <details className="mt-4 rounded-[24px] border p-4" style={{ borderColor: "var(--line)" }}>
+            <summary className="cursor-pointer text-sm font-semibold">Новая статья</summary>
+
+            <form onSubmit={handleCreateEntry} className="mt-3 grid gap-2">
+              <select
+                value={selectedCategoryId}
+                onChange={(event) => setSelectedCategoryId(event.target.value)}
+                className="rounded-2xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: "var(--line)", background: "var(--input)" }}
+              >
+                <option value="">Без категории</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+
+              <input
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                placeholder="Вопрос"
+                className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: "var(--line)", background: "var(--input)" }}
+              />
+
+              <textarea
+                value={answer}
+                onChange={(event) => setAnswer(event.target.value)}
+                placeholder="Ответ"
+                rows={3}
+                className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: "var(--line)", background: "var(--input)" }}
+              />
+
+              <input
+                value={keywords}
+                onChange={(event) => setKeywords(event.target.value)}
+                placeholder="Ключевые слова через запятую"
+                className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                style={{ borderColor: "var(--line)", background: "var(--input)" }}
+              />
+
+              <button
+                type="submit"
+                disabled={!question.trim() || !answer.trim() || isSavingEntry}
+                className="w-fit rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+              >
+                {isSavingEntry ? "Сохранение..." : "Добавить статью"}
+              </button>
+            </form>
+          </details>
         </div>
 
-        {errorMessage ? (
-          <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {errorMessage}
-          </div>
-        ) : null}
-
-        <form
-          onSubmit={handleCreateEntry}
-          className="mt-4 grid gap-3 rounded-[24px] border p-4"
-          style={{ borderColor: "var(--line)" }}
-        >
-          <div className="text-sm font-semibold">Новая статья</div>
-
-          <select
-            value={selectedCategoryId}
-            onChange={(event) => setSelectedCategoryId(event.target.value)}
-            className="rounded-2xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "var(--line)", background: "var(--input)" }}
-          >
-            <option value="">Без категории</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
-          <input
-            value={question}
-            onChange={(event) => setQuestion(event.target.value)}
-            placeholder="Вопрос"
-            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "var(--line)", background: "var(--input)" }}
-          />
-
-          <textarea
-            value={answer}
-            onChange={(event) => setAnswer(event.target.value)}
-            placeholder="Ответ"
-            rows={5}
-            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "var(--line)", background: "var(--input)" }}
-          />
-
-          <input
-            value={keywords}
-            onChange={(event) => setKeywords(event.target.value)}
-            placeholder="Ключевые слова через запятую"
-            className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-            style={{ borderColor: "var(--line)", background: "var(--input)" }}
-          />
-
-          <button
-            type="submit"
-            disabled={!question.trim() || !answer.trim() || isSavingEntry}
-            className="w-fit rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {isSavingEntry ? "Сохранение..." : "Добавить статью"}
-          </button>
-        </form>
-
-        <div className="mt-4 space-y-3">
-          {entries.length === 0 ? (
+        <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+          {filteredEntries.length === 0 ? (
             <div
               className="rounded-[24px] border px-4 py-8 text-center text-sm text-slate-500"
               style={{ borderColor: "var(--line)" }}
             >
-              Статей пока нет
+              Статей по текущему фильтру нет
             </div>
           ) : (
-            entries.map((entry) => (
-              <article
-                key={entry.id}
-                className="rounded-[24px] border p-4"
-                style={{ borderColor: "var(--line)" }}
-              >
-                {editingEntryId === entry.id ? (
-                  <form onSubmit={handleUpdateEntry} className="grid gap-3">
-                    <select
-                      value={editingEntryCategoryId}
-                      onChange={(event) => setEditingEntryCategoryId(event.target.value)}
-                      className="rounded-2xl border px-3 py-2 text-sm outline-none"
-                      style={{ borderColor: "var(--line)", background: "var(--input)" }}
-                    >
-                      <option value="">Без категории</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
+            filteredEntries.map((entry) => {
+              const categoryName =
+                entry.category_id != null ? (categoryNameById.get(entry.category_id) ?? "Без категории") : "Без категории";
 
-                    <input
-                      value={editingQuestion}
-                      onChange={(event) => setEditingQuestion(event.target.value)}
-                      className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                      style={{ borderColor: "var(--line)", background: "var(--input)" }}
-                    />
-
-                    <textarea
-                      value={editingAnswer}
-                      onChange={(event) => setEditingAnswer(event.target.value)}
-                      rows={5}
-                      className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                      style={{ borderColor: "var(--line)", background: "var(--input)" }}
-                    />
-
-                    <input
-                      value={editingKeywords}
-                      onChange={(event) => setEditingKeywords(event.target.value)}
-                      className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
-                      style={{ borderColor: "var(--line)", background: "var(--input)" }}
-                    />
-
-                    <label className="flex items-center gap-2 text-sm text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={editingIsActive}
-                        onChange={(event) => setEditingIsActive(event.target.checked)}
-                      />
-                      Активна
-                    </label>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="submit"
-                        disabled={!editingQuestion.trim() || !editingAnswer.trim() || isUpdatingEntry}
-                        className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+              return (
+                <article
+                  key={entry.id}
+                  className="rounded-[24px] border p-4"
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  {editingEntryId === entry.id ? (
+                    <form ref={entryEditFormRef} onSubmit={handleUpdateEntry} className="grid gap-3">
+                      <select
+                        value={editingEntryCategoryId}
+                        onChange={(event) => setEditingEntryCategoryId(event.target.value)}
+                        className="rounded-2xl border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "var(--line)", background: "var(--input)" }}
                       >
-                        {isUpdatingEntry ? "Сохранение..." : "Сохранить"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={resetEntryEdit}
-                        className="rounded-full border px-3 py-1.5 text-xs"
-                        style={{ borderColor: "var(--line)" }}
-                      >
-                        Отмена
-                      </button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                        {entry.status}
-                      </span>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-                        {entry.is_active ? "active" : "inactive"}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-3 text-sm font-semibold">{entry.question}</h3>
-                    <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{entry.answer}</p>
-
-                    {entry.keywords.length > 0 ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {entry.keywords.map((keyword) => (
-                          <span
-                            key={keyword}
-                            className="rounded-full border px-2.5 py-1 text-xs text-slate-600"
-                            style={{ borderColor: "var(--line)" }}
-                          >
-                            {keyword}
-                          </span>
+                        <option value="">Без категории</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
                         ))}
-                      </div>
-                    ) : null}
+                      </select>
 
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => startEntryEdit(entry)}
-                        className="rounded-full border px-3 py-1.5 text-xs"
-                        style={{ borderColor: "var(--line)" }}
-                      >
-                        Редактировать
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteEntry(entry.id)}
-                        disabled={isDeletingEntry}
-                        className="rounded-full border border-red-200 px-3 py-1.5 text-xs text-red-600 disabled:opacity-60"
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </>
-                )}
-              </article>
-            ))
+                      <input
+                        value={editingQuestion}
+                        onChange={(event) => setEditingQuestion(event.target.value)}
+                        className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "var(--line)", background: "var(--input)" }}
+                      />
+
+                      <textarea
+                        value={editingAnswer}
+                        onChange={(event) => setEditingAnswer(event.target.value)}
+                        rows={5}
+                        className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "var(--line)", background: "var(--input)" }}
+                      />
+
+                      <input
+                        value={editingKeywords}
+                        onChange={(event) => setEditingKeywords(event.target.value)}
+                        className="w-full rounded-2xl border px-3 py-2 text-sm outline-none"
+                        style={{ borderColor: "var(--line)", background: "var(--input)" }}
+                      />
+
+                      <label className="flex items-center gap-2 text-sm text-slate-600">
+                        <input
+                          type="checkbox"
+                          checked={editingIsActive}
+                          onChange={(event) => setEditingIsActive(event.target.checked)}
+                        />
+                        Активна
+                      </label>
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="submit"
+                          disabled={!editingQuestion.trim() || !editingAnswer.trim() || isUpdatingEntry}
+                          className="rounded-full bg-slate-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60"
+                        >
+                          {isUpdatingEntry ? "Сохранение..." : "Сохранить"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resetEntryEdit}
+                          className="rounded-full border px-3 py-1.5 text-xs"
+                          style={{ borderColor: "var(--line)" }}
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {categoryName}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {entry.status}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                          {entry.is_active ? "active" : "inactive"}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-3 text-sm font-semibold">{entry.question}</h3>
+                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-600">{entry.answer}</p>
+
+                      {entry.keywords.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {entry.keywords.map((keyword) => (
+                            <span
+                              key={keyword}
+                              className="rounded-full border px-2.5 py-1 text-xs text-slate-600"
+                              style={{ borderColor: "var(--line)" }}
+                            >
+                              {keyword}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => startEntryEdit(entry)}
+                          className="rounded-full border px-3 py-1.5 text-xs"
+                          style={{ borderColor: "var(--line)" }}
+                        >
+                          Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteEntry(entry.id)}
+                          disabled={isDeletingEntry}
+                          className="rounded-full border border-red-200 px-3 py-1.5 text-xs text-red-600 disabled:opacity-60"
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              );
+            })
           )}
         </div>
       </section>
