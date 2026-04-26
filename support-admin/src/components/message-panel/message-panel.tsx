@@ -61,10 +61,6 @@ export function MessagePanel({
     assignment?.assigned_manager_id != null
       ? managers.find((manager) => manager.id === assignment.assigned_manager_id) ?? null
       : null;
-  const lastReassignedByManager =
-    assignment?.last_reassigned_by_manager_id != null
-      ? managers.find((manager) => manager.id === assignment.last_reassigned_by_manager_id) ?? null
-      : null;
   const selectedChatMeta = selectedChat
     ? [
         selectedChat.subtitle || null,
@@ -317,79 +313,52 @@ export function MessagePanel({
             </div>
 
             {!isTeamChatActive && (
-            <div className="min-w-0 space-y-1 lg:w-[280px]">
-              <div className="flex items-center justify-between gap-3">
-                <span className={`${styles.muted} text-[11px] font-medium uppercase tracking-[0.08em]`}>
-                  Ответственный
-                </span>
-                <span className={`${styles.assignmentBadge} rounded-full px-2.5 py-1 text-[11px] font-medium`}>
-                  {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
-                </span>
-              </div>
+            <div className="min-w-0 lg:w-[500px]">
+              <div className="flex flex-nowrap items-center justify-end gap-2 overflow-x-auto pb-1">
+                <div className="flex shrink-0 items-center gap-2">
+                  <span className={`${styles.muted} text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                    Ответственный
+                  </span>
+                  <span className={`${styles.assignmentBadge} rounded-full px-2.5 py-1 text-[11px] font-medium`}>
+                    {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
+                  </span>
+                </div>
 
-              <label className="block">
-                <select
-                  value={assignment?.assigned_manager_id != null ? String(assignment.assigned_manager_id) : ""}
-                  onChange={handleAssignmentChange}
-                  disabled={!selectedChat || !currentManager || isAssigning}
-                  className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
-                >
-                  <option value="">Без назначения</option>
-                  {managers.map((manager) => (
-                    <option key={manager.id} value={manager.id}>
-                      {formatManagerName(manager)} · {manager.position}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <div className={`${styles.muted} min-h-[16px] truncate text-right text-[11px]`}>
-                {assignmentError
-                  ? assignmentError
-                  : assignment?.last_reassigned_by_manager_name ||
-                      (lastReassignedByManager ? formatManagerName(lastReassignedByManager) : null)
-                    ? `Последнее изменение: ${
-                        assignment?.last_reassigned_by_manager_name ??
-                        (lastReassignedByManager ? formatManagerName(lastReassignedByManager) : "")
-                      }`
-                    : assignedManager
-                      ? `Текущий: ${formatManagerName(assignedManager)}`
-                      : "Назначение не задано"}
-              </div>
-
-              <div className="mt-3 rounded-2xl border px-3 py-3" style={{ borderColor: "var(--line)" }}>
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
-                      ИИ автоответ
-                    </div>
-                    <div className="mt-1 text-sm font-medium">
-                      {assignment?.ai_auto_reply_enabled ?? true ? "Включён" : "Выключен"}
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAiAutoReplyToggle}
-                    disabled={!selectedChat || isTogglingAi}
-                    className={`${styles.assignmentSelect} rounded-xl px-3 py-2 text-sm font-medium outline-none disabled:opacity-60`}
+                <label className="w-[210px] shrink-0">
+                  <select
+                    value={assignment?.assigned_manager_id != null ? String(assignment.assigned_manager_id) : ""}
+                    onChange={handleAssignmentChange}
+                    disabled={!selectedChat || !currentManager || isAssigning}
+                    className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
                   >
-                    {isTogglingAi
-                      ? "Сохранение..."
-                      : assignment?.ai_auto_reply_enabled ?? true
-                        ? "Выключить ИИ"
-                        : "Включить ИИ"}
-                  </button>
-                </div>
+                    <option value="">Без назначения</option>
+                    {managers.map((manager) => (
+                      <option key={manager.id} value={manager.id}>
+                        {formatManagerName(manager)} · {manager.position}
+                      </option>
+                    ))}
+                  </select>
+                </label>
 
-                <div className={`${styles.muted} mt-2 min-h-[16px] text-right text-[11px]`}>
-                  {aiToggleError
-                    ? aiToggleError
+                <button
+                  type="button"
+                  onClick={handleAiAutoReplyToggle}
+                  disabled={!selectedChat || isTogglingAi}
+                  className={`${styles.assignmentSelect} shrink-0 rounded-xl px-3 py-2 text-sm font-medium outline-none disabled:opacity-60`}
+                >
+                  {isTogglingAi
+                    ? "Сохранение..."
                     : assignment?.ai_auto_reply_enabled ?? true
-                      ? "Бот будет отвечать, пока менеджер не выключит AI."
-                      : "Бот не будет отвечать этому клиенту, пока AI не включат снова."}
-                </div>
+                      ? "ИИ: вкл"
+                      : "ИИ: выкл"}
+                </button>
               </div>
+
+              {(assignmentError || aiToggleError) ? (
+                <div className={`${styles.muted} mt-1 min-h-[16px] truncate text-right text-[11px]`}>
+                  {assignmentError ?? aiToggleError}
+                </div>
+              ) : null}
             </div>
             )}
           </div>
