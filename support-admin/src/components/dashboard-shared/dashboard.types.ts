@@ -50,6 +50,7 @@ export type ClientAssignment = {
   previous_manager_id: number | null;
   last_reassigned_by_manager_id: number | null;
   last_reassigned_by_manager_name: string | null;
+  ai_auto_reply_enabled: boolean;
 };
 
 export type ClientReadState = {

@@ -102,24 +102,22 @@ async function findOrCreateClient(message: IncomingTelegramMessage) {
   return createdClient;
 }
 
-async function hasManagerReply(clientId: number) {
+async function isAiAutoReplyEnabled(clientId: number) {
   if (!supabase) {
     throw new Error("Supabase client is not configured");
   }
 
   const { data, error } = await supabase
-    .from("messages")
-    .select("id")
+    .from("client_assignments")
+    .select("ai_auto_reply_enabled")
     .eq("client_id", clientId)
-    .eq("sender_type", "manager")
-    .limit(1)
     .maybeSingle();
 
   if (error) {
     throw error;
   }
 
-  return Boolean(data);
+  return data?.ai_auto_reply_enabled ?? true;
 }
 
 export async function saveIncomingMessage(
@@ -130,7 +128,7 @@ export async function saveIncomingMessage(
   }
 
   const client = await findOrCreateClient(message);
-  const shouldSendAutoReply = !(await hasManagerReply(client.id));
+  const shouldSendAutoReply = await isAiAutoReplyEnabled(client.id);
 
   const { data, error } = await supabase
     .from("messages")

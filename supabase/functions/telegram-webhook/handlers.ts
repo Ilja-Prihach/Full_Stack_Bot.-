@@ -1,13 +1,10 @@
 import {
-  INTERNAL_API_TOKEN,
-  INTERNAL_APP_URL,
   SUPABASE_SERVICE_ROLE_KEY,
   SUPABASE_URL,
   TELEGRAM_BOT_TOKEN,
 } from "./config.ts";
+import { generateAutoReply } from "./ai.ts";
 import {
-  getLastAiReplyAt,
-  getTodayAiReplyCount,
   hasSupabaseConfig,
   incrementTodayAiReplyCount,
   saveAiBotMessage,
@@ -17,11 +14,12 @@ import {
 import { sendTelegramMessage, type TelegramMessageData } from "./telegram.ts";
 
 const MAX_MESSAGE_LENGTH = 500;
-const DAILY_AI_REPLY_LIMIT = 20;
-const AI_REPLY_RATE_LIMIT_MS = 30_000;
 
 const GREETING_REPLY =
   "Здравствуйте! Я бот поддержки веб-студии PixelCraft. Чем могу помочь?";
+
+const GRATITUDE_REPLY =
+  "Пожалуйста! Всегда рад помочь. Если появятся ещё вопросы по сайту или проекту, пишите.";
 
 const FALLBACK_REPLY =
   "К сожалению, я не нашёл точного ответа на ваш вопрос. Я передал ваш запрос менеджеру — он свяжется с вами в ближайшее время.";
@@ -40,15 +38,15 @@ const GREETING_PATTERNS = [
   "салют",
 ];
 
-type AutoReplyApiResponse = {
-  ok?: boolean;
-  shouldReply?: boolean;
-  answer?: string | null;
-  confidence?: number;
-  matchedEntryIds?: number[];
-  reason?: string;
-  error?: string;
-};
+const GRATITUDE_PATTERNS = [
+  "спасибо",
+  "благодарю",
+  "благодарствую",
+  "спс",
+  "thanks",
+  "thank you",
+  "thx",
+];
 
 function normalizeMessageText(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
@@ -60,40 +58,10 @@ function isGreetingMessage(messageText: string) {
   return GREETING_PATTERNS.some((pattern) => normalized.includes(pattern));
 }
 
-function isRateLimited(lastReplyAt: string | null) {
-  if (!lastReplyAt) {
-    return false;
-  }
+function isGratitudeMessage(messageText: string) {
+  const normalized = normalizeMessageText(messageText);
 
-  const diff = Date.now() - new Date(lastReplyAt).getTime();
-  return diff < AI_REPLY_RATE_LIMIT_MS;
-}
-
-async function requestAutoReply(messageText: string, clientId: number, sourceMessageId: number) {
-  if (!INTERNAL_APP_URL || !INTERNAL_API_TOKEN) {
-    throw new Error("Internal AI API is not configured");
-  }
-
-  const response = await fetch(`${INTERNAL_APP_URL}/api/ai/auto-reply`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-internal-api-token": INTERNAL_API_TOKEN,
-    },
-    body: JSON.stringify({
-      messageText,
-      clientId,
-      sourceMessageId,
-    }),
-  });
-
-  const payload = (await response.json()) as AutoReplyApiResponse;
-
-  if (!response.ok || payload.ok === false) {
-    throw new Error(payload.error ?? "Auto-reply API request failed");
-  }
-
-  return payload;
+  return GRATITUDE_PATTERNS.some((pattern) => normalized.includes(pattern));
 }
 
 async function sendAndStoreAiReply(clientId: number, chatId: number, replyText: string) {
@@ -180,37 +148,6 @@ export async function handleIncomingTextMessage(message: TelegramMessageData) {
     return Response.json({ ok: true });
   }
 
-  const lastReplyAt = await getLastAiReplyAt(clientId);
-
-  if (isRateLimited(lastReplyAt)) {
-    await saveAiReplyEvent({
-      clientId,
-      sourceMessageId: messageId,
-      replyType: "none",
-      decision: "ignored_rate_limited",
-      messageText: message.messageText,
-    });
-
-    return Response.json({ ok: true });
-  }
-
-  const todayReplyCount = await getTodayAiReplyCount(clientId);
-
-  if (todayReplyCount >= DAILY_AI_REPLY_LIMIT) {
-    await sendAndStoreAiReply(clientId, message.chatId, FALLBACK_REPLY);
-
-    await saveAiReplyEvent({
-      clientId,
-      sourceMessageId: messageId,
-      replyType: "fallback",
-      decision: "fallback_daily_limit_reached",
-      messageText: message.messageText,
-      replyText: FALLBACK_REPLY,
-    });
-
-    return Response.json({ ok: true });
-  }
-
   if (isGreetingMessage(normalizedMessageText)) {
     await sendAndStoreAiReply(clientId, message.chatId, GREETING_REPLY);
     await incrementTodayAiReplyCount(clientId);
@@ -227,8 +164,24 @@ export async function handleIncomingTextMessage(message: TelegramMessageData) {
     return Response.json({ ok: true });
   }
 
+  if (isGratitudeMessage(normalizedMessageText)) {
+    await sendAndStoreAiReply(clientId, message.chatId, GRATITUDE_REPLY);
+    await incrementTodayAiReplyCount(clientId);
+
+    await saveAiReplyEvent({
+      clientId,
+      sourceMessageId: messageId,
+      replyType: "answer",
+      decision: "gratitude_sent",
+      messageText: message.messageText,
+      replyText: GRATITUDE_REPLY,
+    });
+
+    return Response.json({ ok: true });
+  }
+
   try {
-    const aiResult = await requestAutoReply(message.messageText, clientId, messageId);
+    const aiResult = await generateAutoReply(message.messageText);
 
     if (aiResult.shouldReply && aiResult.answer) {
       await sendAndStoreAiReply(clientId, message.chatId, aiResult.answer);

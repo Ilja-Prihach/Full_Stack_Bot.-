@@ -105,7 +105,8 @@ export default async function Home() {
             assigned_manager_id,
             previous_manager_id,
             last_reassigned_by_manager_id,
-            last_reassigned_by_manager_name
+            last_reassigned_by_manager_name,
+            ai_auto_reply_enabled
           `,
         ),
       supabase

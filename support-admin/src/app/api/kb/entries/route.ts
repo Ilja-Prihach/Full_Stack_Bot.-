@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getSupabaseSessionCookies } from "@/lib/admin-auth";
+import { markKbEntryEmbeddingFailed, reindexKbEntry } from "@/lib/rag/kb-embeddings";
 import { createAuthenticatedSupabaseClient } from "@/lib/supabase";
 
 type RouteError = {
@@ -179,7 +180,33 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, entry: data });
+    try {
+      await reindexKbEntry({
+        id: data.id,
+        question: data.question,
+        answer: data.answer,
+        keywords: data.keywords ?? [],
+      });
+
+      return NextResponse.json({
+        ok: true,
+        entry: {
+          ...data,
+          status: "embedding_ready",
+        },
+      });
+    } catch (embeddingError) {
+      console.error("Failed to create embedding for KB entry:", embeddingError);
+      await markKbEntryEmbeddingFailed(data.id);
+
+      return NextResponse.json({
+        ok: true,
+        entry: {
+          ...data,
+          status: "embedding_failed",
+        },
+      });
+    }
   } catch (error) {
     if (isRouteError(error)) {
       return NextResponse.json(
