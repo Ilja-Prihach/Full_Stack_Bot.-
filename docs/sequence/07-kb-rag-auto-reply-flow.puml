@@ -1,0 +1,133 @@
+@startuml
+title Auto-reply через Knowledge Base + RAG
+
+autonumber
+skinparam shadowing false
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Пользователь Telegram" as tg_user
+participant "Telegram" as telegram
+participant "telegram-webhook" as webhook
+database "public.clients" as clients
+database "public.messages" as messages
+database "public.ai_daily_usage" as daily_usage
+database "public.ai_reply_events" as reply_events
+participant "support-admin /api/ai/auto-reply" as ai_api
+participant "RAG pipeline" as rag
+database "public.kb_entries" as kb_entries
+database "public.kb_embeddings" as kb_embeddings
+participant "OpenAI API" as openai
+participant "Admin UI" as ui
+
+tg_user -> telegram : Отправляет сообщение в бот
+telegram -> webhook : Webhook update\nchat, user, text
+
+webhook -> clients : Ищет или создаёт клиента
+clients --> webhook : client_id
+
+webhook -> messages : Сохраняет входящее сообщение\nsender_type = client
+messages --> webhook : source_message_id
+
+alt Сообщение не текстовое
+  webhook -> reply_events : Пишет событие\nreply_type = none\ndecision = ignored_non_text
+  webhook --> telegram : 200 OK без ответа
+else Текстовое сообщение
+  webhook -> webhook : Проверка длины текста
+
+  alt Сообщение слишком длинное
+    webhook -> telegram : Отправляет fallback\n"Запрос передан менеджеру"
+    webhook -> reply_events : Пишет событие\ndecision = fallback_too_long
+    webhook --> telegram : 200 OK
+  else Длина допустима
+    webhook -> webhook : Проверка rate-limit\n1 авто-ответ / 30 сек
+
+    alt Rate-limit нарушен
+      webhook -> reply_events : Пишет событие\ndecision = ignored_rate_limited
+      webhook --> telegram : 200 OK без ответа
+    else Rate-limit пройден
+      webhook -> webhook : Проверка greeting
+
+      alt Greeting распознан
+        webhook -> daily_usage : Проверяет usage за сегодня
+        daily_usage --> webhook : reply_count
+
+        alt Дневной лимит исчерпан
+          webhook -> telegram : Отправляет fallback\n"Скоро ответит менеджер"
+          webhook -> reply_events : Пишет событие\ndecision = fallback_limit_reached
+        else Лимит не исчерпан
+          webhook -> telegram : Отправляет greeting
+          webhook -> messages : Сохраняет ответ\nsender_type = ai_bot
+          webhook -> daily_usage : Увеличивает reply_count
+          webhook -> reply_events : Пишет событие\ndecision = greeting_sent
+        end
+
+        webhook --> telegram : 200 OK
+      else Не greeting
+        webhook -> daily_usage : Проверяет usage за сегодня
+        daily_usage --> webhook : reply_count
+
+        alt Дневной лимит исчерпан
+          webhook -> telegram : Отправляет fallback\n"Скоро ответит менеджер"
+          webhook -> reply_events : Пишет событие\ndecision = fallback_limit_reached
+          webhook --> telegram : 200 OK
+        else Лимит не исчерпан
+          webhook -> ai_api : POST /api/ai/auto-reply\nmessageText, clientId, sourceMessageId
+
+          ai_api -> rag : generateAiReply(messageText)
+          rag -> openai : Создать embedding вопроса
+          openai --> rag : query_embedding
+
+          rag -> kb_embeddings : Vector search top-k
+          kb_embeddings --> rag : candidate kb_entry_id + similarity
+          rag -> kb_entries : Загружает активные статьи
+          kb_entries --> rag : Контекст для ответа
+
+          alt Лучший match ниже порога
+            rag --> ai_api : shouldReply = false\nreason = low_confidence
+          else Match найден
+            rag -> openai : Генерирует ответ\nтолько по KB контексту
+            openai --> rag : answer
+            rag --> ai_api : shouldReply = true\nanswer, confidence, matchedEntryIds
+          end
+
+          ai_api --> webhook : decision result
+
+          alt shouldReply = true
+            webhook -> telegram : Отправляет AI-ответ
+            webhook -> messages : Сохраняет ответ\nsender_type = ai_bot
+            webhook -> daily_usage : Увеличивает reply_count
+            webhook -> reply_events : Пишет событие\nconfidence, matchedEntryIds,\ndecision = ai_reply_sent
+          else shouldReply = false
+            webhook -> telegram : Отправляет fallback\n"Запрос передан менеджеру"
+            webhook -> reply_events : Пишет событие\nconfidence, decision = fallback_no_match
+          end
+
+          webhook --> telegram : 200 OK
+        end
+      end
+    end
+  end
+end
+
+== Управление базой знаний ==
+
+ui -> kb_entries : GET/POST/PATCH/DELETE статей
+ui -> kb_embeddings : Проверяет статус векторизации
+
+ui -> kb_entries : Создаёт или обновляет статью
+kb_entries --> ui : Статья сохранена
+ui -> ai_api : Запуск embedding refresh\nили отдельный KB endpoint
+ai_api -> openai : Создаёт embedding статьи
+openai --> ai_api : embedding
+ai_api -> kb_embeddings : Сохраняет embedding
+ai_api --> ui : status = embedding_ready
+
+== Отображение в админке ==
+
+ui -> messages : Запрашивает историю чата
+messages --> ui : client + manager + ai_bot сообщения
+ui -> reply_events : Опционально запрашивает AI audit
+reply_events --> ui : confidence, decision, matchedEntryIds
+
+@enduml

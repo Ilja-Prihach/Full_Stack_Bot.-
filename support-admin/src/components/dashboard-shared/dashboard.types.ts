@@ -1,7 +1,7 @@
 export type Message = {
   id: string | number;
   client_id: number;
-  sender_type: "client" | "manager";
+  sender_type: "client" | "manager" | "ai_bot";
   sender_label: string;
   text: string;
   created_at: string;
@@ -50,6 +50,7 @@ export type ClientAssignment = {
   previous_manager_id: number | null;
   last_reassigned_by_manager_id: number | null;
   last_reassigned_by_manager_name: string | null;
+  ai_auto_reply_enabled: boolean;
 };
 
 export type ClientReadState = {

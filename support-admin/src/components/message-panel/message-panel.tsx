@@ -51,9 +51,11 @@ export function MessagePanel({
   const [draft, setDraft] = useState("");
   const [sendError, setSendError] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
+  const [aiToggleError, setAiToggleError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSending, startSending] = useTransition();
   const [isAssigning, startAssigning] = useTransition();
+  const [isTogglingAi, startTogglingAi] = useTransition();
 
   const assignedManager =
     assignment?.assigned_manager_id != null
@@ -263,6 +265,36 @@ export function MessagePanel({
     });
   }
 
+  function handleAiAutoReplyToggle() {
+    if (!selectedChat) {
+      return;
+    }
+
+    const nextEnabled = !(assignment?.ai_auto_reply_enabled ?? true);
+    setAiToggleError(null);
+
+    startTogglingAi(async () => {
+      const response = await fetch(`/api/clients/${selectedChat.clientId}/ai-auto-reply`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          enabled: nextEnabled,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || payload.ok === false) {
+        setAiToggleError(payload.error ?? "Не удалось обновить настройку AI");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
@@ -323,6 +355,40 @@ export function MessagePanel({
                     : assignedManager
                       ? `Текущий: ${formatManagerName(assignedManager)}`
                       : "Назначение не задано"}
+              </div>
+
+              <div className="mt-3 rounded-2xl border px-3 py-3" style={{ borderColor: "var(--line)" }}>
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted)]">
+                      ИИ автоответ
+                    </div>
+                    <div className="mt-1 text-sm font-medium">
+                      {assignment?.ai_auto_reply_enabled ?? true ? "Включён" : "Выключен"}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAiAutoReplyToggle}
+                    disabled={!selectedChat || isTogglingAi}
+                    className={`${styles.assignmentSelect} rounded-xl px-3 py-2 text-sm font-medium outline-none disabled:opacity-60`}
+                  >
+                    {isTogglingAi
+                      ? "Сохранение..."
+                      : assignment?.ai_auto_reply_enabled ?? true
+                        ? "Выключить ИИ"
+                        : "Включить ИИ"}
+                  </button>
+                </div>
+
+                <div className={`${styles.muted} mt-2 min-h-[16px] text-right text-[11px]`}>
+                  {aiToggleError
+                    ? aiToggleError
+                    : assignment?.ai_auto_reply_enabled ?? true
+                      ? "Бот будет отвечать, пока менеджер не выключит AI."
+                      : "Бот не будет отвечать этому клиенту, пока AI не включат снова."}
+                </div>
               </div>
             </div>
             )}
@@ -406,15 +472,21 @@ export function MessagePanel({
               ) : (
                 messages.map((message) => {
                   const isManagerMessage = message.sender_type === "manager";
+                  const isAiBotMessage = message.sender_type === "ai_bot";
+                  const badgeLabel = isManagerMessage
+                    ? "Менеджер"
+                    : isAiBotMessage
+                      ? "ИИ Ассистент"
+                      : "Клиент";
 
                   return (
                     <article
                       key={message.id}
-                      className={`flex ${isManagerMessage ? "justify-end" : "justify-start"}`}
+                      className={`flex ${(isManagerMessage || isAiBotMessage) ? "justify-end" : "justify-start"}`}
                     >
                       <div
                         className={`${styles.messageBubble} ${
-                          isManagerMessage
+                          isManagerMessage || isAiBotMessage
                             ? styles.messageBubbleOutgoing
                             : styles.messageBubbleIncoming
                         } max-w-[88%] rounded-[20px] px-3 py-3 sm:max-w-[72%] sm:px-4 sm:py-3.5`}
@@ -425,7 +497,7 @@ export function MessagePanel({
 
                         <div className="mt-2 flex items-center justify-between gap-2 text-[11px]">
                           <span className={`${styles.badgeMuted} rounded-full px-2.5 py-0.5`}>
-                            {isManagerMessage ? "Менеджер" : "Клиент"}
+                            {badgeLabel}
                           </span>
                           <span className={styles.muted}>{formatTime(message.created_at)}</span>
                         </div>

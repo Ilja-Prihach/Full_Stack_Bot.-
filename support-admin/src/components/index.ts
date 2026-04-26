@@ -4,6 +4,7 @@ export { AdminLogin } from "./admin-login";
 export { AdminResetPassword } from "./admin-reset-password";
 export { ChatSidebar } from "./chat-sidebar";
 export { DashboardHero } from "./dashboard-hero";
+export { KnowledgeBase } from "./knowledge-base";
 export { MessagePanel } from "./message-panel";
 export type {
   AdminDashboardProps,

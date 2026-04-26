@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { getBrowserRealtimeClient } from "@/lib/supabase";
 import { ChatSidebar } from "../chat-sidebar";
 import { DashboardHero } from "../dashboard-hero";
+import { KnowledgeBase } from "../knowledge-base";
 import type {
   AdminDashboardProps,
   ChatAssignmentFilter,
@@ -48,6 +49,7 @@ export function AdminDashboard({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
   const [isTeamChatActive, setIsTeamChatActive] = useState(true);
+  const [isKnowledgeBaseActive, setIsKnowledgeBaseActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
   const [managerStatusOverrides, setManagerStatusOverrides] = useState(
     () => new Map<number, ManagerAvailabilityStatus | null>(),
@@ -434,6 +436,10 @@ export function AdminDashboard({
           theme={theme}
           isLoggingOut={isLoggingOut}
           onLogout={handleLogout}
+          isKnowledgeBaseActive={isKnowledgeBaseActive}
+          onToggleKnowledgeBase={() =>
+            setIsKnowledgeBaseActive((current) => !current)
+          }
           onToggleTheme={() =>
             setTheme((currentTheme) => (currentTheme === "light" ? "dark" : "light"))
           }
@@ -446,6 +452,8 @@ export function AdminDashboard({
             <div className="rounded-[24px] border border-red-200 bg-red-50 p-6 text-red-700">
               Не удалось загрузить сообщения из Supabase: {errorMessage}
             </div>
+          ) : isKnowledgeBaseActive ? (
+            <KnowledgeBase />
           ) : (
             <div className="grid gap-3 lg:h-full lg:min-h-0 lg:gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
               <ChatSidebar
