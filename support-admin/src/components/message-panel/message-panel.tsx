@@ -49,6 +49,19 @@ function getWorkflowStatusLabel(status: WorkflowStatus) {
   }
 }
 
+function getWorkflowStatusHelpText(status: WorkflowStatus) {
+  switch (status) {
+    case "in_progress":
+      return "Менеджер ведёт диалог. ИИ не отвечает.";
+    case "waiting_client":
+      return "Ожидаем ответ клиента. ИИ не отвечает.";
+    case "completed":
+      return "Диалог закрыт. Если клиент напишет снова, чат вернётся в новые.";
+    default:
+      return "Новый диалог. ИИ может отвечать, если не выключен вручную.";
+  }
+}
+
 function getPriorityLabel(priority: ClientAssignment["priority_label"]) {
   switch (priority) {
     case "high":
@@ -105,6 +118,7 @@ export function MessagePanel({
   const workflowStatus = assignment?.workflow_status ?? "new";
   const priorityLabel = assignment?.priority_label ?? "low";
   const priorityReason = assignment?.priority_reason ?? null;
+  const workflowStatusHelpText = getWorkflowStatusHelpText(workflowStatus);
   const selectedChatMeta = selectedChat
     ? [
         selectedChat.subtitle || null,
@@ -406,7 +420,7 @@ export function MessagePanel({
                   </span>
                 </div>
 
-                <label className="w-[170px] shrink-0">
+                <label className="w-[190px] shrink-0">
                   <select
                     value={workflowStatus}
                     onChange={handleWorkflowStatusChange}
@@ -450,9 +464,16 @@ export function MessagePanel({
                 </button>
               </div>
 
-              <div className={`${styles.muted} mt-1 min-h-[16px] text-right text-[11px]`}>
-                {assignmentError ?? aiToggleError ?? statusError ?? getAiStateLabel(assignment)}
-                {priorityReason ? ` · ${priorityReason}` : ""}
+              <div className="mt-1 space-y-1 text-right">
+                <div className={`${styles.muted} min-h-[16px] text-[11px]`}>
+                  {assignmentError ?? aiToggleError ?? statusError ?? getAiStateLabel(assignment)}
+                  {priorityReason ? ` · ${priorityReason}` : ""}
+                </div>
+                {!assignmentError && !aiToggleError && !statusError ? (
+                  <div className={`${styles.muted} text-[11px]`}>
+                    {workflowStatusHelpText}
+                  </div>
+                ) : null}
               </div>
             </div>
             )}
