@@ -14,6 +14,10 @@ export type Message = {
   } | null;
 };
 
+export type WorkflowStatus = "new" | "in_progress" | "waiting_client" | "completed";
+
+export type PriorityLabel = "high" | "medium" | "low";
+
 export type ChatPreview = {
   clientId: number;
   telegramChatId: number | null;
@@ -51,6 +55,14 @@ export type ClientAssignment = {
   last_reassigned_by_manager_id: number | null;
   last_reassigned_by_manager_name: string | null;
   ai_auto_reply_enabled: boolean;
+  workflow_status: WorkflowStatus;
+  priority_score: number;
+  priority_label: PriorityLabel;
+  priority_reason: string | null;
+  last_client_message_at: string | null;
+  last_manager_message_at: string | null;
+  status_updated_at: string;
+  priority_updated_at: string;
 };
 
 export type ClientReadState = {
