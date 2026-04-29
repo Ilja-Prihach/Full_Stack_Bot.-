@@ -22,6 +22,13 @@ type SaveIncomingMessageResult = {
   messageId: number | null;
 };
 
+type WorkflowStatus = "new" | "in_progress" | "completed";
+
+type ClientAssignmentState = {
+  workflowStatus: WorkflowStatus;
+  aiAutoReplyEnabled: boolean;
+};
+
 type AiReplyEventInput = {
   clientId: number;
   sourceMessageId: number | null;
@@ -102,14 +109,14 @@ async function findOrCreateClient(message: IncomingTelegramMessage) {
   return createdClient;
 }
 
-async function isAiAutoReplyEnabled(clientId: number) {
+async function getClientAssignmentState(clientId: number): Promise<ClientAssignmentState> {
   if (!supabase) {
     throw new Error("Supabase client is not configured");
   }
 
   const { data, error } = await supabase
     .from("client_assignments")
-    .select("ai_auto_reply_enabled")
+    .select("workflow_status, ai_auto_reply_enabled")
     .eq("client_id", clientId)
     .maybeSingle();
 
@@ -117,7 +124,50 @@ async function isAiAutoReplyEnabled(clientId: number) {
     throw error;
   }
 
-  return data?.ai_auto_reply_enabled ?? true;
+  return {
+    workflowStatus: (data?.workflow_status as WorkflowStatus | null) ?? "new",
+    aiAutoReplyEnabled: data?.ai_auto_reply_enabled ?? true,
+  };
+}
+
+function getNextWorkflowStatusOnIncomingMessage(
+  currentStatus: WorkflowStatus,
+): WorkflowStatus {
+  if (currentStatus === "completed") {
+    return "new";
+  }
+
+  return currentStatus;
+}
+
+async function syncClientAssignmentOnIncomingMessage(
+  clientId: number,
+  currentStatus: WorkflowStatus,
+  nextStatus: WorkflowStatus,
+) {
+  if (!supabase) {
+    throw new Error("Supabase client is not configured");
+  }
+
+  const now = new Date().toISOString();
+  const payload: Record<string, unknown> = {
+    client_id: clientId,
+    workflow_status: nextStatus,
+    last_client_message_at: now,
+    updated_at: now,
+  };
+
+  if (currentStatus !== nextStatus) {
+    payload.status_updated_at = now;
+  }
+
+  const { error } = await supabase.from("client_assignments").upsert(payload, {
+    onConflict: "client_id",
+  });
+
+  if (error) {
+    throw error;
+  }
 }
 
 export async function saveIncomingMessage(
@@ -128,7 +178,6 @@ export async function saveIncomingMessage(
   }
 
   const client = await findOrCreateClient(message);
-  const shouldSendAutoReply = await isAiAutoReplyEnabled(client.id);
 
   const { data, error } = await supabase
     .from("messages")
@@ -141,6 +190,29 @@ export async function saveIncomingMessage(
     })
     .select("id")
     .single();
+
+  if (error) {
+    return {
+      error,
+      shouldSendAutoReply: false,
+      clientId: client.id ?? null,
+      messageId: data?.id ?? null,
+    };
+  }
+
+  const assignmentState = await getClientAssignmentState(client.id);
+  const nextWorkflowStatus = getNextWorkflowStatusOnIncomingMessage(
+    assignmentState.workflowStatus,
+  );
+
+  await syncClientAssignmentOnIncomingMessage(
+    client.id,
+    assignmentState.workflowStatus,
+    nextWorkflowStatus,
+  );
+
+  const shouldSendAutoReply =
+    nextWorkflowStatus === "new" && assignmentState.aiAutoReplyEnabled;
 
   return {
     error,

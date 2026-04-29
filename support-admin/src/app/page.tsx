@@ -106,7 +106,17 @@ export default async function Home() {
             previous_manager_id,
             last_reassigned_by_manager_id,
             last_reassigned_by_manager_name,
-            ai_auto_reply_enabled
+            ai_auto_reply_enabled,
+            workflow_status,
+            priority_mode,
+            manual_priority_label,
+            priority_score,
+            priority_label,
+            priority_reason,
+            last_client_message_at,
+            last_manager_message_at,
+            status_updated_at,
+            priority_updated_at
           `,
         ),
       supabase

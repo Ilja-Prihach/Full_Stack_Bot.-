@@ -8,7 +8,9 @@ import type {
   ManagerDisplayStatus,
   ManagerProfile,
   Message,
+  PriorityLabel,
   TeamMessage,
+  WorkflowStatus,
 } from "../dashboard-shared";
 import { formatTime, getManagerStatusMeta } from "../dashboard-shared";
 import styles from "./message-panel.module.css";
@@ -35,6 +37,85 @@ function getTeamMessageSenderName(message: TeamMessage, managers: ManagerProfile
   return computedName || message.sender_name || "Менеджер";
 }
 
+function getWorkflowStatusLabel(status: WorkflowStatus) {
+  switch (status) {
+    case "in_progress":
+      return "В работе";
+    case "completed":
+      return "Не в работе";
+    default:
+      return "Новый";
+  }
+}
+
+function getWorkflowStatusHelpText(status: WorkflowStatus) {
+  switch (status) {
+    case "in_progress":
+      return "Менеджер ведёт диалог. ИИ не отвечает.";
+    case "completed":
+      return "Клиент сейчас не в активной работе. Если напишет снова, чат вернётся в новые.";
+    default:
+      return "Новый диалог. ИИ может отвечать, если не выключен вручную.";
+  }
+}
+
+function getPriorityLabel(priority: ClientAssignment["priority_label"]) {
+  switch (priority) {
+    case "high":
+      return "High";
+    case "medium":
+      return "Medium";
+    default:
+      return "Low";
+  }
+}
+
+function getEffectivePriorityLabel(assignment: ClientAssignment | null): PriorityLabel {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return assignment.manual_priority_label;
+  }
+
+  return assignment?.priority_label ?? "low";
+}
+
+function getEffectivePriorityReason(assignment: ClientAssignment | null) {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return `Ручной приоритет: ${assignment.manual_priority_label.toUpperCase()}`;
+  }
+
+  return assignment?.priority_reason ?? null;
+}
+
+function getPrioritySelectValue(assignment: ClientAssignment | null): "auto" | PriorityLabel {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return assignment.manual_priority_label;
+  }
+
+  return "auto";
+}
+
+function getCurrentPriorityStateLabel(assignment: ClientAssignment | null) {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return `Сейчас: ${getPriorityLabel(assignment.manual_priority_label)} · ручной`;
+  }
+
+  return "Сейчас: авто";
+}
+
+function getAiStateLabel(assignment: ClientAssignment | null) {
+  const workflowStatus = assignment?.workflow_status ?? "new";
+  const aiEnabled = assignment?.ai_auto_reply_enabled ?? true;
+  const workflowLabel = getWorkflowStatusLabel(workflowStatus);
+
+  if (workflowStatus === "new") {
+    return aiEnabled
+      ? `${workflowLabel} · ИИ включён`
+      : `${workflowLabel} · ИИ выключен вручную`;
+  }
+
+  return `${workflowLabel} · ИИ отключён по статусу`;
+}
+
 export function MessagePanel({
   selectedChat,
   messages,
@@ -52,15 +133,26 @@ export function MessagePanel({
   const [sendError, setSendError] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [aiToggleError, setAiToggleError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [priorityError, setPriorityError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [isSending, startSending] = useTransition();
   const [isAssigning, startAssigning] = useTransition();
   const [isTogglingAi, startTogglingAi] = useTransition();
+  const [isUpdatingStatus, startUpdatingStatus] = useTransition();
+  const [isUpdatingPriority, startUpdatingPriority] = useTransition();
 
   const assignedManager =
     assignment?.assigned_manager_id != null
       ? managers.find((manager) => manager.id === assignment.assigned_manager_id) ?? null
       : null;
+  const workflowStatus = assignment?.workflow_status ?? "new";
+  const priorityMode = assignment?.priority_mode ?? "auto";
+  const manualPriorityLabel = assignment?.manual_priority_label ?? null;
+  const priorityLabel = getEffectivePriorityLabel(assignment);
+  const priorityReason = getEffectivePriorityReason(assignment);
+  const workflowStatusHelpText = getWorkflowStatusHelpText(workflowStatus);
   const selectedChatMeta = selectedChat
     ? [
         selectedChat.subtitle || null,
@@ -291,6 +383,68 @@ export function MessagePanel({
     });
   }
 
+  function handleWorkflowStatusChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextStatus = event.target.value as WorkflowStatus;
+
+    if (!selectedChat) {
+      return;
+    }
+
+    setStatusError(null);
+
+    startUpdatingStatus(async () => {
+      const response = await fetch(`/api/clients/${selectedChat.clientId}/workflow-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || payload.ok === false) {
+        setStatusError(payload.error ?? "Не удалось обновить статус");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
+  function handlePriorityChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextPriority = event.target.value as "auto" | PriorityLabel;
+
+    if (!selectedChat) {
+      return;
+    }
+
+    setPriorityError(null);
+
+    startUpdatingPriority(async () => {
+      const response = await fetch(`/api/clients/${selectedChat.clientId}/priority`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          priority: nextPriority,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || payload.ok === false) {
+        setPriorityError(payload.error ?? "Не удалось обновить приоритет");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
@@ -313,52 +467,113 @@ export function MessagePanel({
             </div>
 
             {!isTeamChatActive && (
-            <div className="min-w-0 lg:w-[500px]">
+            <div className="min-w-0 lg:w-[420px]">
               <div className="flex flex-nowrap items-center justify-end gap-2 overflow-x-auto pb-1">
-                <div className="flex shrink-0 items-center gap-2">
-                  <span className={`${styles.muted} text-[11px] font-medium uppercase tracking-[0.08em]`}>
-                    Ответственный
-                  </span>
-                  <span className={`${styles.assignmentBadge} rounded-full px-2.5 py-1 text-[11px] font-medium`}>
-                    {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
-                  </span>
-                </div>
-
-                <label className="w-[210px] shrink-0">
-                  <select
-                    value={assignment?.assigned_manager_id != null ? String(assignment.assigned_manager_id) : ""}
-                    onChange={handleAssignmentChange}
-                    disabled={!selectedChat || !currentManager || isAssigning}
-                    className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
-                  >
-                    <option value="">Без назначения</option>
-                    {managers.map((manager) => (
-                      <option key={manager.id} value={manager.id}>
-                        {formatManagerName(manager)} · {manager.position}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
                 <button
                   type="button"
-                  onClick={handleAiAutoReplyToggle}
-                  disabled={!selectedChat || isTogglingAi}
-                  className={`${styles.assignmentSelect} shrink-0 rounded-xl px-3 py-2 text-sm font-medium outline-none disabled:opacity-60`}
+                  onClick={() => setIsControlsOpen((current) => !current)}
+                  className={`${styles.assignmentSelect} shrink-0 rounded-xl px-3 py-2 text-sm font-medium outline-none`}
                 >
-                  {isTogglingAi
-                    ? "Сохранение..."
-                    : assignment?.ai_auto_reply_enabled ?? true
-                      ? "ИИ: вкл"
-                      : "ИИ: выкл"}
+                  {isControlsOpen ? "Скрыть управление" : "Управление"}
                 </button>
+                <span className={`${styles.assignmentBadge} shrink-0 rounded-full px-2 py-1 text-[11px] font-medium`}>
+                  {getWorkflowStatusLabel(workflowStatus)}
+                </span>
+                <span className={`${priorityLabel === "high" ? "bg-red-100 text-red-700" : priorityLabel === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"} shrink-0 rounded-full px-2 py-1 text-[11px] font-medium`}>
+                  Приоритет: {getPriorityLabel(priorityLabel)}{priorityMode === "manual" ? " · ручной" : ""}
+                </span>
+                <span className={`${styles.assignmentBadge} min-w-0 max-w-[170px] shrink truncate rounded-full px-2 py-1 text-[11px] font-medium`}>
+                  {assignedManager ? `Ответственный: ${formatManagerName(assignedManager)}` : "Без назначения"}
+                </span>
               </div>
 
-              {(assignmentError || aiToggleError) ? (
-                <div className={`${styles.muted} mt-1 min-h-[16px] truncate text-right text-[11px]`}>
-                  {assignmentError ?? aiToggleError}
+              {isControlsOpen ? (
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <label className="min-w-0">
+                    <span className={`${styles.muted} mb-1 block text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                      Статус чата
+                    </span>
+                    <select
+                      value={workflowStatus}
+                      onChange={handleWorkflowStatusChange}
+                      disabled={!selectedChat || isUpdatingStatus}
+                      className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
+                    >
+                      <option value="new">Новый</option>
+                      <option value="in_progress">В работе</option>
+                      <option value="completed">Не в работе</option>
+                    </select>
+                  </label>
+
+                  <label className="min-w-0">
+                    <span className={`${styles.muted} mb-1 block text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                      Приоритет
+                    </span>
+                    <select
+                      value={getPrioritySelectValue(assignment)}
+                      onChange={handlePriorityChange}
+                      disabled={!selectedChat || isUpdatingPriority}
+                      className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
+                    >
+                      <option value="auto">Приоритет: авто</option>
+                      <option value="high">Приоритет: High</option>
+                      <option value="medium">Приоритет: Medium</option>
+                      <option value="low">Приоритет: Low</option>
+                    </select>
+                    <span className={`${styles.muted} mt-1 block text-[11px]`}>
+                      {getCurrentPriorityStateLabel(assignment)}
+                    </span>
+                  </label>
+
+                  <label className="min-w-0 sm:col-span-2">
+                    <span className={`${styles.muted} mb-1 block text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                      Ответственный менеджер
+                    </span>
+                    <select
+                      value={assignment?.assigned_manager_id != null ? String(assignment.assigned_manager_id) : ""}
+                      onChange={handleAssignmentChange}
+                      disabled={!selectedChat || !currentManager || isAssigning}
+                      className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
+                    >
+                      <option value="">Без назначения</option>
+                      {managers.map((manager) => (
+                        <option key={manager.id} value={manager.id}>
+                          {formatManagerName(manager)} · {manager.position}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleAiAutoReplyToggle}
+                    disabled={!selectedChat || isTogglingAi}
+                    className={`${styles.assignmentSelect} sm:col-span-2 rounded-xl px-3 py-2 text-sm font-medium outline-none disabled:opacity-60`}
+                    title="Ручное включение или выключение ИИ для новых чатов"
+                  >
+                    {isTogglingAi
+                      ? "Сохранение..."
+                      : assignment?.ai_auto_reply_enabled ?? true
+                        ? "ИИ: вкл"
+                        : "ИИ: выкл"}
+                  </button>
                 </div>
               ) : null}
+
+              <div className="mt-1 space-y-1 text-right">
+                <div className={`${styles.muted} min-h-[16px] text-[11px]`}>
+                  {assignmentError ?? aiToggleError ?? statusError ?? priorityError ?? getAiStateLabel(assignment)}
+                  {priorityReason ? ` · ${priorityReason}` : ""}
+                </div>
+                {isControlsOpen && !assignmentError && !aiToggleError && !statusError && !priorityError ? (
+                  <div className={`${styles.muted} text-[11px]`}>
+                    {workflowStatusHelpText}
+                    {priorityMode === "manual"
+                      ? ` Текущий ручной приоритет: ${getPriorityLabel(manualPriorityLabel ?? priorityLabel)}.`
+                      : " Приоритет сейчас рассчитывается автоматически."}
+                  </div>
+                ) : null}
+              </div>
             </div>
             )}
           </div>

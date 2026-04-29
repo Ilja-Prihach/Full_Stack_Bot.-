@@ -1,9 +1,20 @@
-import type { ChatPreview, ClientReadState, ManagerDisplayStatus, Message } from "./dashboard.types";
+import type {
+  ChatPreview,
+  ClientAssignment,
+  ClientReadState,
+  ManagerDisplayStatus,
+  Message,
+  PriorityLabel,
+  WorkflowStatus,
+} from "./dashboard.types";
+
+const DASHBOARD_TIME_ZONE = "Europe/Minsk";
 
 export function formatTime(timestamp: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: DASHBOARD_TIME_ZONE,
   }).format(new Date(timestamp));
 }
 
@@ -87,9 +98,74 @@ function getChatIdentity(chatMessages: Message[]) {
   };
 }
 
-export function getChatPreviews(messages: Message[], readStates: ClientReadState[] = []) {
+function getWorkflowStatusOrder(status: WorkflowStatus) {
+  switch (status) {
+    case "new":
+      return 0;
+    case "in_progress":
+      return 1;
+    case "completed":
+      return 2;
+    default:
+      return 99;
+  }
+}
+
+function getLatestClientMessageTimestamp(chatMessages: Message[]) {
+  return (
+    chatMessages.find((message) => message.sender_type === "client")?.created_at ??
+    chatMessages[0]?.created_at ??
+    null
+  );
+}
+
+function getPriorityLabelRank(priority: PriorityLabel) {
+  switch (priority) {
+    case "high":
+      return 3;
+    case "medium":
+      return 2;
+    case "low":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function getEffectivePriorityLabel(assignment: ClientAssignment | null): PriorityLabel {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return assignment.manual_priority_label;
+  }
+
+  return assignment?.priority_label ?? "low";
+}
+
+function getEffectivePriorityScore(assignment: ClientAssignment | null): number {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return getPriorityLabelRank(assignment.manual_priority_label) * 100;
+  }
+
+  return assignment?.priority_score ?? 0;
+}
+
+function getEffectivePriorityReason(assignment: ClientAssignment | null): string | null {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return `Ручной приоритет: ${assignment.manual_priority_label.toUpperCase()}`;
+  }
+
+  return assignment?.priority_reason ?? null;
+}
+
+export function getChatPreviews(
+  messages: Message[],
+  readStates: ClientReadState[] = [],
+  assignments: ClientAssignment[] = [],
+) {
   const byChat = new Map<number, Message[]>();
   const readStateByClientId = new Map(readStates.map((readState) => [readState.client_id, readState]));
+  const assignmentsByClientId = new Map(
+    assignments.map((assignment) => [assignment.client_id, assignment]),
+  );
 
   for (const message of messages) {
     const existing = byChat.get(message.client_id) ?? [];
@@ -102,6 +178,15 @@ export function getChatPreviews(messages: Message[], readStates: ClientReadState
   for (const [clientId, chatMessages] of byChat.entries()) {
     const latestMessage = chatMessages[0];
     const identity = getChatIdentity(chatMessages);
+    const assignment = assignmentsByClientId.get(clientId) ?? null;
+    const workflowStatus = assignment?.workflow_status ?? "new";
+    const priorityMode = assignment?.priority_mode ?? "auto";
+    const manualPriorityLabel = assignment?.manual_priority_label ?? null;
+    const priorityScore = getEffectivePriorityScore(assignment);
+    const priorityLabel = getEffectivePriorityLabel(assignment);
+    const priorityReason = getEffectivePriorityReason(assignment);
+    const lastClientTimestamp =
+      assignment?.last_client_message_at ?? getLatestClientMessageTimestamp(chatMessages);
 
     previews.push({
       clientId,
@@ -111,6 +196,13 @@ export function getChatPreviews(messages: Message[], readStates: ClientReadState
       lastMessage: latestMessage.text,
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,
+      workflowStatus,
+      priorityMode,
+      manualPriorityLabel,
+      priorityScore,
+      priorityLabel,
+      priorityReason,
+      isAssigned: assignment?.assigned_manager_id != null,
       unreadCount: chatMessages.filter((message) => {
         if (message.sender_type !== "client") {
           return false;
@@ -125,12 +217,50 @@ export function getChatPreviews(messages: Message[], readStates: ClientReadState
         return Number(message.id) > readState.last_read_message_id;
       }).length,
     });
+
+    if (lastClientTimestamp) {
+      previews[previews.length - 1].lastTimestamp = lastClientTimestamp;
+    }
   }
 
-  previews.sort(
-    (left, right) =>
-      new Date(right.lastTimestamp).getTime() - new Date(left.lastTimestamp).getTime(),
-  );
+  previews.sort((left, right) => {
+    const statusDiff =
+      getWorkflowStatusOrder(left.workflowStatus) - getWorkflowStatusOrder(right.workflowStatus);
+
+    if (statusDiff !== 0) {
+      return statusDiff;
+    }
+
+    const assignmentDiff = Number(left.isAssigned) - Number(right.isAssigned);
+
+    if (assignmentDiff !== 0) {
+      return assignmentDiff;
+    }
+
+    const manualModeDiff = Number(right.priorityMode === "manual") - Number(left.priorityMode === "manual");
+
+    if (manualModeDiff !== 0) {
+      return manualModeDiff;
+    }
+
+    if (left.priorityMode === "manual" && right.priorityMode === "manual") {
+      const manualPriorityDiff =
+        getPriorityLabelRank(right.manualPriorityLabel ?? "low") -
+        getPriorityLabelRank(left.manualPriorityLabel ?? "low");
+
+      if (manualPriorityDiff !== 0) {
+        return manualPriorityDiff;
+      }
+    }
+
+    const priorityDiff = right.priorityScore - left.priorityScore;
+
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return new Date(right.lastTimestamp).getTime() - new Date(left.lastTimestamp).getTime();
+  });
 
   return previews;
 }

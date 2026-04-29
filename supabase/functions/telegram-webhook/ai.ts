@@ -54,6 +54,7 @@ type OpenAiResponsesResponse = {
 };
 
 const MATCH_LIMIT = 5;
+const MIN_MATCH_SIMILARITY = 0.22;
 
 const supabase =
   SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY
@@ -204,6 +205,17 @@ export async function generateAutoReply(messageText: string): Promise<AutoReplyR
   }
 
   const bestMatch = matches[0];
+
+  if (bestMatch.similarity < MIN_MATCH_SIMILARITY) {
+    return {
+      shouldReply: false,
+      answer: null,
+      confidence: bestMatch.similarity,
+      matchedEntryIds: matches.map((item) => item.entry.id),
+      reason: "no_match",
+    };
+  }
+
   let answer = bestMatch.entry.answer;
 
   try {

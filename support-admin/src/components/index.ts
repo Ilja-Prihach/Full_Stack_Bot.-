@@ -10,6 +10,8 @@ export type {
   AdminDashboardProps,
   ChatPreview,
   ChatAssignmentFilter,
+  ChatPriorityFilter,
+  ChatWorkflowFilter,
   ClientAssignment,
   ClientReadState,
   ManagerAvailabilityStatus,
@@ -17,6 +19,9 @@ export type {
   ManagerProfile,
   ManagerStatusRecord,
   Message,
+  PriorityLabel,
+  PriorityMode,
   TeamMessage,
   TeamReadState,
+  WorkflowStatus,
 } from "./dashboard-shared";

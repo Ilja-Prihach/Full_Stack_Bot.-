@@ -14,6 +14,12 @@ export type Message = {
   } | null;
 };
 
+export type WorkflowStatus = "new" | "in_progress" | "completed";
+
+export type PriorityLabel = "high" | "medium" | "low";
+
+export type PriorityMode = "auto" | "manual";
+
 export type ChatPreview = {
   clientId: number;
   telegramChatId: number | null;
@@ -23,6 +29,13 @@ export type ChatPreview = {
   lastTimestamp: string;
   totalMessages: number;
   unreadCount: number;
+  workflowStatus: WorkflowStatus;
+  priorityMode: PriorityMode;
+  manualPriorityLabel: PriorityLabel | null;
+  priorityScore: number;
+  priorityLabel: PriorityLabel;
+  priorityReason: string | null;
+  isAssigned: boolean;
 };
 
 export type ManagerProfile = {
@@ -51,6 +64,16 @@ export type ClientAssignment = {
   last_reassigned_by_manager_id: number | null;
   last_reassigned_by_manager_name: string | null;
   ai_auto_reply_enabled: boolean;
+  workflow_status: WorkflowStatus;
+  priority_mode: PriorityMode;
+  manual_priority_label: PriorityLabel | null;
+  priority_score: number;
+  priority_label: PriorityLabel;
+  priority_reason: string | null;
+  last_client_message_at: string | null;
+  last_manager_message_at: string | null;
+  status_updated_at: string;
+  priority_updated_at: string;
 };
 
 export type ClientReadState = {
@@ -66,6 +89,10 @@ export type ChatAssignmentFilter =
   | "unassigned"
   | "mine"
   | `manager:${number}`;
+
+export type ChatWorkflowFilter = "all" | WorkflowStatus;
+
+export type ChatPriorityFilter = "all" | PriorityLabel;
 
 export type TeamMessage = {
   id: number;
