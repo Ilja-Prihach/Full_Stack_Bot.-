@@ -12,6 +12,7 @@ participant "Support Admin API" as api
 database "public.managers" as managers
 database "public.clients" as clients
 database "public.messages" as messages
+database "public.client_assignments" as assignments
 participant "Supabase Realtime" as realtime
 participant "Telegram Bot API" as telegram
 
@@ -26,10 +27,14 @@ api -> telegram : Отправляет текст клиенту
 telegram --> api : Сообщение доставлено
 api -> messages : Создаёт сообщение\nclient_id,\nsender_type = manager,\nsender_manager_id = current manager,\nsender_label = "Менеджер",\ntext, created_at = now()
 messages --> api : Сообщение сохранено
+api -> assignments : UPDATE or INSERT fallback\nlast_manager_message_at = now()\nworkflow_status = in_progress\nstatus_updated_at = now()
+assignments --> api : Operational state сохранён
 api --> ui : 200 OK with saved message
 ui -> ui : router.refresh()\nпосле успешной отправки
 messages -> realtime : WAL change event
 realtime -> ui : postgres_changes event\n(table = messages)
-ui --> manager : Показывает сообщение в диалоге\nпосле refresh/realtime
+assignments -> realtime : WAL change event
+realtime -> ui : postgres_changes event\n(table = client_assignments)
+ui --> manager : Показывает сообщение,\nстатус "В работе" и\nобновлённый чат-лист
 
 @enduml

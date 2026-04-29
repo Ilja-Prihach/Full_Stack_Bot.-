@@ -23,44 +23,37 @@ actor "Telegram User" as TelegramUser
 actor "Support Manager" as SupportManager
 rectangle "Telegram Bot API" as TelegramApi
 rectangle "Supabase Realtime\nWebSocket" as SupabaseRealtime
+rectangle "OpenAI API\nembeddings + responses" as OpenAiApi
 
 package "SupportBot" as SupportBot {
   rectangle "support-admin\nNext.js admin dashboard" as SupportAdmin
-  rectangle "admin reply API\n/api/clients/{id}/messages" as ReplyApi
-  rectangle "manager status API\n/api/manager-status" as ManagerStatusApi
+  rectangle "Knowledge Base admin APIs\n/api/kb/* + /api/clients/*" as AdminApi
   rectangle "telegram-webhook\nSupabase Edge Function" as TelegramWebhook
-  database "Supabase Postgres\nmessages, team_messages,\nmanager_statuses, read states,\nclients, managers, assignments" as MessagesDb
+  database "Supabase Postgres\nclients, messages, managers,\nclient assignments, read states,\nteam chat, manager statuses,\nknowledge base, ai usage,\nai reply events" as SupportDb
 }
 
 rectangle "Supabase Platform" as SupabasePlatform
 
-TelegramUser -[hidden]-> TelegramApi
-TelegramApi -[hidden]-> TelegramWebhook
-TelegramWebhook -[hidden]-> MessagesDb
-SupportManager -[hidden]-> SupportAdmin
-SupportAdmin -[hidden]-> ReplyApi
-SupportAdmin -[hidden]-> SupabaseRealtime
-MessagesDb -[hidden]-> SupabasePlatform
+TelegramUser --> TelegramApi : sends support\nmessage
+TelegramApi --> TelegramWebhook : forwards webhook\nupdate
+TelegramWebhook --> SupportDb : upserts client,\nstores inbound message,\nupdates workflow status,\nAI eligibility and timestamps
+TelegramWebhook --> OpenAiApi : creates embeddings\nand formats answer
+TelegramWebhook --> SupportDb : searches KB,\nstores ai_bot message,\nai usage and ai events
+TelegramWebhook --> TelegramApi : sends greeting,\nAI answer or fallback
 
-TelegramUser --> TelegramApi : sends\nsupport message
-TelegramApi --> TelegramWebhook : forwards\nwebhook update
-TelegramWebhook --> MessagesDb : persists inbound\nmessage and client data
-TelegramWebhook --> TelegramApi : sends conditional\nacknowledgement
+SupportManager --> SupportAdmin : opens dashboard,\nworks with dialogs
+SupportAdmin --> SupportDb : reads dialogs,\nworkflow status,\npriority, assignee,\nteam chat and KB data
+SupportAdmin --> AdminApi : sends admin actions\n(status, priority,\nassignment, KB reindex)
+AdminApi --> SupportDb : updates chat state,\nmanual priority and KB data
+AdminApi --> OpenAiApi : creates KB embeddings\nfor reindexing
 
-SupportManager --> SupportAdmin : opens dashboard
-SupportManager --> ReplyApi : sends reply\nthrough admin UI
-SupportManager --> ManagerStatusApi : updates custom\navailability status
-SupportAdmin --> MessagesDb : reads dialogs\nand manager data
-ReplyApi --> TelegramApi : sends manager\nmessage
-ReplyApi --> MessagesDb : stores outgoing\nmanager message
-ManagerStatusApi --> MessagesDb : upserts manager\navailability status
-MessagesDb --> SupabaseRealtime : emits table\nchange events
-SupabaseRealtime --> SupportAdmin : pushes realtime\nupdates over WebSocket
+SupportDb --> SupabaseRealtime : emits table\nchange events
+SupabaseRealtime --> SupportAdmin : pushes realtime\nupdates
 
 TelegramWebhook --> SupabasePlatform : deployed on
-MessagesDb --> SupabasePlatform : hosted by
 SupportAdmin --> SupabasePlatform : uses project URL,\nauth session and realtime
-ReplyApi --> SupabasePlatform : uses project URL\nand manager session
-ManagerStatusApi --> SupabasePlatform : uses project URL\nand manager session
+AdminApi --> SupabasePlatform : uses manager session
+SupportDb --> SupabasePlatform : hosted by
+OpenAiApi --> SupabasePlatform : external AI provider
 
 @enduml

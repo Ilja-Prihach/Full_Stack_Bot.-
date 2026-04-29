@@ -6,8 +6,8 @@ hide circle
 
 skinparam shadowing false
 skinparam linetype ortho
-skinparam nodesep 140
-skinparam ranksep 150
+skinparam nodesep 120
+skinparam ranksep 140
 skinparam entity {
   BackgroundColor white
   BorderColor black
@@ -50,8 +50,24 @@ entity "public.client_assignments" as client_assignments {
   previous_manager_id : bigint <<FK>>
   last_reassigned_by_manager_id : bigint <<FK>>
   last_reassigned_by_manager_name : varchar(255)
+  * ai_auto_reply_enabled : boolean = true
+  * workflow_status : text
+  * priority_mode : text = 'auto'
+  manual_priority_label : text
+  * priority_score : integer = 0
+  * priority_label : text = 'low'
+  priority_reason : text
+  last_client_message_at : timestamptz
+  last_manager_message_at : timestamptz
+  status_updated_at : timestamptz = now()
+  priority_updated_at : timestamptz = now()
   * created_at : timestamptz = now()
   updated_at : timestamptz
+  <<CHECK workflow_status IN ('new', 'in_progress', 'completed')>>
+  <<CHECK priority_mode IN ('auto', 'manual')>>
+  <<CHECK priority_label IN ('high', 'medium', 'low')>>
+  <<CHECK manual_priority_label IS NULL OR manual_priority_label IN ('high', 'medium', 'low')>>
+  <<CHECK priority_score >= 0>>
 }
 
 entity "public.messages" as messages {
@@ -68,6 +84,7 @@ entity "public.messages" as messages {
   * sender_label : varchar(255)
   * text : text
   * created_at : timestamptz = now()
+  <<CHECK sender_type IN ('client', 'manager', 'ai_bot')>>
 }
 
 entity "public.client_read_states" as client_read_states {
@@ -106,10 +123,67 @@ entity "public.manager_statuses" as manager_statuses {
   <<CHECK status IN ('online', 'away', 'coffee')>>
 }
 
+entity "public.kb_categories" as kb_categories {
+  * id : bigint <<PK>>
+  --
+  * name : varchar(255)
+  description : text
+  * created_at : timestamptz = now()
+}
+
+entity "public.kb_entries" as kb_entries {
+  * id : bigint <<PK>>
+  --
+  category_id : bigint <<FK>>
+  * question : text
+  * answer : text
+  * keywords : text[]
+  * status : text
+  * is_active : boolean
+  created_by_manager_id : bigint <<FK>>
+  * created_at : timestamptz = now()
+  * updated_at : timestamptz = now()
+  <<CHECK status IN ('draft', 'embedding_pending', 'embedding_ready', 'embedding_failed')>>
+}
+
+entity "public.kb_embeddings" as kb_embeddings {
+  * id : bigint <<PK>>
+  --
+  * kb_entry_id : bigint <<FK, UNIQUE>>
+  * content_hash : text
+  * embedding : vector(1536)
+  * created_at : timestamptz = now()
+}
+
+entity "public.ai_daily_usage" as ai_daily_usage {
+  * usage_date : date <<PK>>
+  * client_id : bigint <<PK, FK>>
+  --
+  * reply_count : integer
+  * created_at : timestamptz = now()
+  * updated_at : timestamptz = now()
+}
+
+entity "public.ai_reply_events" as ai_reply_events {
+  * id : bigint <<PK>>
+  --
+  * client_id : bigint <<FK>>
+  source_message_id : bigint <<FK>>
+  * reply_type : text
+  * decision : text
+  confidence : double precision
+  * kb_entry_ids : jsonb
+  message_text : text
+  reply_text : text
+  * created_at : timestamptz = now()
+}
+
 auth_users ||--o{ managers : "auth user"
 clients ||--|| client_assignments : "assignment"
 clients ||--o{ messages : "messages"
 clients ||--o{ client_read_states : "read states"
+clients ||--o{ ai_daily_usage : "daily ai usage"
+clients ||--o{ ai_reply_events : "ai events"
 managers ||--o{ client_assignments : "current manager"
 managers ||--o{ client_assignments : "previous manager"
 managers ||--o{ client_assignments : "reassigned by"
@@ -118,42 +192,57 @@ managers ||--o{ client_read_states : "read by manager"
 managers ||--o{ team_messages : "sender"
 managers ||--o{ team_read_states : "read state"
 managers ||--|| manager_statuses : "custom status"
+managers ||--o{ kb_entries : "created by"
+kb_categories ||--o{ kb_entries : "categorises"
+kb_entries ||--|| kb_embeddings : "embedding"
+messages ||--o{ client_read_states : "last read"
+messages ||--o{ ai_reply_events : "source message"
 
 note right of messages
-  Client support messages.
-  Supports both client and
-  manager messages via sender_type.
-  Legacy columns kept for transition.
+  Client dialog history.
+  Supports client, manager
+  and ai_bot messages.
+  Legacy Telegram columns
+  are still present.
   RLS enabled, manager-only access.
   Realtime publication enabled.
 end note
 
-note right of team_messages
-  Internal team chat between
-  all managers. No client linkage.
-  RLS enabled, manager-only access.
-  Realtime publication enabled.
+note right of client_assignments
+  Operational state of the dialog:
+  assignee, AI manual toggle,
+  workflow status and priority.
+  Webhook AI replies only when
+  workflow_status = new and
+  ai_auto_reply_enabled = true.
+  Manual priority overrides the
+  auto score in admin UI and sorting.
 end note
 
-note right of client_read_states
-  Tracks last read message
-  per client per manager.
-  Used for unread counts in sidebar.
+note right of kb_entries
+  Knowledge base articles
+  used by the webhook AI flow.
+  New and updated entries start as
+  embedding_pending and are
+  reindexed via admin routes.
 end note
 
-note right of team_read_states
-  Tracks last read team message
-  per manager.
-  One row per manager.
+note right of kb_embeddings
+  Vector embeddings used by
+  match_kb_entries RPC for
+  semantic search in webhook AI.
 end note
 
-note right of manager_statuses
-  Stores custom manager
-  availability state:
-  online / away / coffee.
-  Presence is used separately
-  for online/offline tracking.
-  Realtime publication enabled.
+note right of ai_reply_events
+  Audit trail for webhook decisions:
+  greeting, answer, fallback,
+  no_match, manager_request
+  and internal errors.
+end note
+
+note right of ai_daily_usage
+  Daily counter of successful
+  automated replies per client.
 end note
 
 @enduml
