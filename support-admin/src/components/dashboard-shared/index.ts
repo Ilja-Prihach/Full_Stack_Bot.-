@@ -12,6 +12,7 @@ export type {
   ManagerStatusRecord,
   Message,
   PriorityLabel,
+  PriorityMode,
   TeamMessage,
   TeamReadState,
   WorkflowStatus,

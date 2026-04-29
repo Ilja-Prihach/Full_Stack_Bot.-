@@ -18,6 +18,8 @@ export type WorkflowStatus = "new" | "in_progress" | "waiting_client" | "complet
 
 export type PriorityLabel = "high" | "medium" | "low";
 
+export type PriorityMode = "auto" | "manual";
+
 export type ChatPreview = {
   clientId: number;
   telegramChatId: number | null;
@@ -61,6 +63,8 @@ export type ClientAssignment = {
   last_reassigned_by_manager_name: string | null;
   ai_auto_reply_enabled: boolean;
   workflow_status: WorkflowStatus;
+  priority_mode: PriorityMode;
+  manual_priority_label: PriorityLabel | null;
   priority_score: number;
   priority_label: PriorityLabel;
   priority_reason: string | null;

@@ -8,6 +8,7 @@ import type {
   ManagerDisplayStatus,
   ManagerProfile,
   Message,
+  PriorityLabel,
   TeamMessage,
   WorkflowStatus,
 } from "../dashboard-shared";
@@ -73,6 +74,14 @@ function getPriorityLabel(priority: ClientAssignment["priority_label"]) {
   }
 }
 
+function getPrioritySelectValue(assignment: ClientAssignment | null): "auto" | PriorityLabel {
+  if (assignment?.priority_mode === "manual" && assignment.manual_priority_label) {
+    return assignment.manual_priority_label;
+  }
+
+  return "auto";
+}
+
 function getAiStateLabel(assignment: ClientAssignment | null) {
   const workflowStatus = assignment?.workflow_status ?? "new";
   const aiEnabled = assignment?.ai_auto_reply_enabled ?? true;
@@ -105,17 +114,21 @@ export function MessagePanel({
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [aiToggleError, setAiToggleError] = useState<string | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [priorityError, setPriorityError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSending, startSending] = useTransition();
   const [isAssigning, startAssigning] = useTransition();
   const [isTogglingAi, startTogglingAi] = useTransition();
   const [isUpdatingStatus, startUpdatingStatus] = useTransition();
+  const [isUpdatingPriority, startUpdatingPriority] = useTransition();
 
   const assignedManager =
     assignment?.assigned_manager_id != null
       ? managers.find((manager) => manager.id === assignment.assigned_manager_id) ?? null
       : null;
   const workflowStatus = assignment?.workflow_status ?? "new";
+  const priorityMode = assignment?.priority_mode ?? "auto";
+  const manualPriorityLabel = assignment?.manual_priority_label ?? null;
   const priorityLabel = assignment?.priority_label ?? "low";
   const priorityReason = assignment?.priority_reason ?? null;
   const workflowStatusHelpText = getWorkflowStatusHelpText(workflowStatus);
@@ -380,6 +393,37 @@ export function MessagePanel({
     });
   }
 
+  function handlePriorityChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextPriority = event.target.value as "auto" | PriorityLabel;
+
+    if (!selectedChat) {
+      return;
+    }
+
+    setPriorityError(null);
+
+    startUpdatingPriority(async () => {
+      const response = await fetch(`/api/clients/${selectedChat.clientId}/priority`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          priority: nextPriority,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || payload.ok === false) {
+        setPriorityError(payload.error ?? "Не удалось обновить приоритет");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
@@ -408,7 +452,7 @@ export function MessagePanel({
                   {getWorkflowStatusLabel(workflowStatus)}
                 </span>
                 <span className={`${priorityLabel === "high" ? "bg-red-100 text-red-700" : priorityLabel === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"} shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium`}>
-                  Приоритет: {getPriorityLabel(priorityLabel)}
+                  Приоритет: {getPriorityLabel(priorityLabel)}{priorityMode === "manual" ? " · ручной" : ""}
                 </span>
 
                 <div className="flex shrink-0 items-center gap-2">
@@ -431,6 +475,20 @@ export function MessagePanel({
                     <option value="in_progress">В работе</option>
                     <option value="waiting_client">Ждёт клиента</option>
                     <option value="completed">Завершён</option>
+                  </select>
+                </label>
+
+                <label className="w-[210px] shrink-0">
+                  <select
+                    value={getPrioritySelectValue(assignment)}
+                    onChange={handlePriorityChange}
+                    disabled={!selectedChat || isUpdatingPriority}
+                    className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
+                  >
+                    <option value="auto">Приоритет: авто</option>
+                    <option value="high">Приоритет: High</option>
+                    <option value="medium">Приоритет: Medium</option>
+                    <option value="low">Приоритет: Low</option>
                   </select>
                 </label>
 
@@ -466,12 +524,15 @@ export function MessagePanel({
 
               <div className="mt-1 space-y-1 text-right">
                 <div className={`${styles.muted} min-h-[16px] text-[11px]`}>
-                  {assignmentError ?? aiToggleError ?? statusError ?? getAiStateLabel(assignment)}
+                  {assignmentError ?? aiToggleError ?? statusError ?? priorityError ?? getAiStateLabel(assignment)}
                   {priorityReason ? ` · ${priorityReason}` : ""}
                 </div>
-                {!assignmentError && !aiToggleError && !statusError ? (
+                {!assignmentError && !aiToggleError && !statusError && !priorityError ? (
                   <div className={`${styles.muted} text-[11px]`}>
                     {workflowStatusHelpText}
+                    {priorityMode === "manual"
+                      ? ` Текущий ручной приоритет: ${getPriorityLabel(manualPriorityLabel ?? priorityLabel)}.`
+                      : " Приоритет сейчас рассчитывается автоматически."}
                   </div>
                 ) : null}
               </div>

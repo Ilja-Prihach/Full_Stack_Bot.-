@@ -108,6 +108,8 @@ export default async function Home() {
             last_reassigned_by_manager_name,
             ai_auto_reply_enabled,
             workflow_status,
+            priority_mode,
+            manual_priority_label,
             priority_score,
             priority_label,
             priority_reason,
