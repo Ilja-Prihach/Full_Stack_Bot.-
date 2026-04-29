@@ -477,7 +477,7 @@ export function ChatSidebar({
                           {getWorkflowStatusLabel(chat.workflowStatus)}
                         </span>
                         <span className={`${chat.priorityLabel === "high" ? "bg-red-100 text-red-700" : chat.priorityLabel === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"} rounded-full px-2 py-0.5 text-[10px] font-medium`}>
-                          {chat.priorityLabel.toUpperCase()}
+                          {chat.priorityLabel.toUpperCase()}{chat.priorityMode === "manual" ? " · ручной" : ""}
                         </span>
                         {!chat.isAssigned ? (
                           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">

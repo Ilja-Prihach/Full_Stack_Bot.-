@@ -30,6 +30,8 @@ export type ChatPreview = {
   totalMessages: number;
   unreadCount: number;
   workflowStatus: WorkflowStatus;
+  priorityMode: PriorityMode;
+  manualPriorityLabel: PriorityLabel | null;
   priorityScore: number;
   priorityLabel: PriorityLabel;
   priorityReason: string | null;

@@ -4,6 +4,7 @@ import type {
   ClientReadState,
   ManagerDisplayStatus,
   Message,
+  PriorityLabel,
   WorkflowStatus,
 } from "./dashboard.types";
 
@@ -120,6 +121,19 @@ function getLatestClientMessageTimestamp(chatMessages: Message[]) {
   );
 }
 
+function getPriorityLabelRank(priority: PriorityLabel) {
+  switch (priority) {
+    case "high":
+      return 3;
+    case "medium":
+      return 2;
+    case "low":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
 export function getChatPreviews(
   messages: Message[],
   readStates: ClientReadState[] = [],
@@ -144,6 +158,8 @@ export function getChatPreviews(
     const identity = getChatIdentity(chatMessages);
     const assignment = assignmentsByClientId.get(clientId) ?? null;
     const workflowStatus = assignment?.workflow_status ?? "new";
+    const priorityMode = assignment?.priority_mode ?? "auto";
+    const manualPriorityLabel = assignment?.manual_priority_label ?? null;
     const priorityScore = assignment?.priority_score ?? 0;
     const priorityLabel = assignment?.priority_label ?? "low";
     const priorityReason = assignment?.priority_reason ?? null;
@@ -159,6 +175,8 @@ export function getChatPreviews(
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,
       workflowStatus,
+      priorityMode,
+      manualPriorityLabel,
       priorityScore,
       priorityLabel,
       priorityReason,
@@ -195,6 +213,22 @@ export function getChatPreviews(
 
     if (assignmentDiff !== 0) {
       return assignmentDiff;
+    }
+
+    const manualModeDiff = Number(right.priorityMode === "manual") - Number(left.priorityMode === "manual");
+
+    if (manualModeDiff !== 0) {
+      return manualModeDiff;
+    }
+
+    if (left.priorityMode === "manual" && right.priorityMode === "manual") {
+      const manualPriorityDiff =
+        getPriorityLabelRank(right.manualPriorityLabel ?? "low") -
+        getPriorityLabelRank(left.manualPriorityLabel ?? "low");
+
+      if (manualPriorityDiff !== 0) {
+        return manualPriorityDiff;
+      }
     }
 
     const priorityDiff = right.priorityScore - left.priorityScore;
