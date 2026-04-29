@@ -41,10 +41,8 @@ function getWorkflowStatusLabel(status: WorkflowStatus) {
   switch (status) {
     case "in_progress":
       return "В работе";
-    case "waiting_client":
-      return "Ждёт клиента";
     case "completed":
-      return "Завершён";
+      return "Не в работе";
     default:
       return "Новый";
   }
@@ -54,10 +52,8 @@ function getWorkflowStatusHelpText(status: WorkflowStatus) {
   switch (status) {
     case "in_progress":
       return "Менеджер ведёт диалог. ИИ не отвечает.";
-    case "waiting_client":
-      return "Ожидаем ответ клиента. ИИ не отвечает.";
     case "completed":
-      return "Диалог закрыт. Если клиент напишет снова, чат вернётся в новые.";
+      return "Клиент сейчас не в активной работе. Если напишет снова, чат вернётся в новые.";
     default:
       return "Новый диалог. ИИ может отвечать, если не выключен вручную.";
   }
@@ -473,8 +469,7 @@ export function MessagePanel({
                   >
                     <option value="new">Новый</option>
                     <option value="in_progress">В работе</option>
-                    <option value="waiting_client">Ждёт клиента</option>
-                    <option value="completed">Завершён</option>
+                    <option value="completed">Не в работе</option>
                   </select>
                 </label>
 

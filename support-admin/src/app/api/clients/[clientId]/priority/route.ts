@@ -93,6 +93,55 @@ async function requireClient(supabase: SupabaseClient, clientId: number): Promis
   return client as ClientRecord;
 }
 
+async function savePriorityOverride(
+  supabase: ReturnType<typeof createAuthenticatedSupabaseClient>,
+  clientId: number,
+  priority: PriorityOption,
+) {
+  const now = new Date().toISOString();
+  const isManual = priority !== "auto";
+  const updatePayload = {
+    priority_mode: isManual ? "manual" : "auto",
+    manual_priority_label: isManual ? priority : null,
+    updated_at: now,
+    priority_updated_at: now,
+  };
+
+  const { data: updatedRows, error: updateError } = await supabase
+    .from("client_assignments")
+    .update(updatePayload)
+    .eq("client_id", clientId)
+    .select("client_id");
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  if ((updatedRows ?? []).length > 0) {
+    return {
+      priorityMode: isManual ? "manual" : "auto",
+      manualPriorityLabel: isManual ? priority : null,
+    };
+  }
+
+  const { error: insertError } = await supabase.from("client_assignments").insert({
+    client_id: clientId,
+    priority_mode: isManual ? "manual" : "auto",
+    manual_priority_label: isManual ? priority : null,
+    updated_at: now,
+    priority_updated_at: now,
+  });
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  return {
+    priorityMode: isManual ? "manual" : "auto",
+    manualPriorityLabel: isManual ? priority : null,
+  };
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ clientId: string }> },
@@ -106,35 +155,21 @@ export async function POST(
 
     await requireCurrentManager(supabase, accessToken);
     await requireClient(supabase, parsedClientId);
+    try {
+      const result = await savePriorityOverride(supabase, parsedClientId, priority);
 
-    const now = new Date().toISOString();
-    const isManual = priority !== "auto";
-
-    const { error } = await supabase.from("client_assignments").upsert(
-      {
-        client_id: parsedClientId,
-        priority_mode: isManual ? "manual" : "auto",
-        manual_priority_label: isManual ? priority : null,
-        updated_at: now,
-        priority_updated_at: now,
-      },
-      {
-        onConflict: "client_id",
-      },
-    );
-
-    if (error) {
+      return NextResponse.json({
+        ok: true,
+        priorityMode: result.priorityMode,
+        manualPriorityLabel: result.manualPriorityLabel,
+      });
+    } catch (error) {
+      console.error("Failed to save priority override:", error);
       return NextResponse.json(
         { ok: false, error: "Не удалось обновить приоритет клиента" },
         { status: 500 },
       );
     }
-
-    return NextResponse.json({
-      ok: true,
-      priorityMode: isManual ? "manual" : "auto",
-      manualPriorityLabel: isManual ? priority : null,
-    });
   } catch (error) {
     if (isRouteError(error)) {
       return NextResponse.json(

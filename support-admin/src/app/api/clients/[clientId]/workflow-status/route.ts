@@ -9,7 +9,7 @@ type RouteError = {
   status: number;
 };
 
-type WorkflowStatus = "new" | "in_progress" | "waiting_client" | "completed";
+type WorkflowStatus = "new" | "in_progress" | "completed";
 
 type ClientRecord = {
   id: number;
@@ -18,7 +18,6 @@ type ClientRecord = {
 const WORKFLOW_STATUSES: WorkflowStatus[] = [
   "new",
   "in_progress",
-  "waiting_client",
   "completed",
 ];
 
@@ -98,6 +97,44 @@ async function requireClient(supabase: SupabaseClient, clientId: number): Promis
   return client as ClientRecord;
 }
 
+async function saveWorkflowStatus(
+  supabase: ReturnType<typeof createAuthenticatedSupabaseClient>,
+  clientId: number,
+  workflowStatus: WorkflowStatus,
+) {
+  const now = new Date().toISOString();
+  const updatePayload = {
+    workflow_status: workflowStatus,
+    status_updated_at: now,
+    updated_at: now,
+  };
+
+  const { data: updatedRows, error: updateError } = await supabase
+    .from("client_assignments")
+    .update(updatePayload)
+    .eq("client_id", clientId)
+    .select("client_id");
+
+  if (updateError) {
+    throw updateError;
+  }
+
+  if ((updatedRows ?? []).length > 0) {
+    return;
+  }
+
+  const { error: insertError } = await supabase.from("client_assignments").insert({
+    client_id: clientId,
+    workflow_status: workflowStatus,
+    status_updated_at: now,
+    updated_at: now,
+  });
+
+  if (insertError) {
+    throw insertError;
+  }
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ clientId: string }> },
@@ -111,22 +148,10 @@ export async function POST(
 
     await requireCurrentManager(supabase, accessToken);
     await requireClient(supabase, parsedClientId);
-
-    const now = new Date().toISOString();
-
-    const { error } = await supabase.from("client_assignments").upsert(
-      {
-        client_id: parsedClientId,
-        workflow_status: workflowStatus,
-        status_updated_at: now,
-        updated_at: now,
-      },
-      {
-        onConflict: "client_id",
-      },
-    );
-
-    if (error) {
+    try {
+      await saveWorkflowStatus(supabase, parsedClientId, workflowStatus);
+    } catch (error) {
+      console.error("Failed to save workflow status:", error);
       return NextResponse.json(
         { ok: false, error: "Не удалось обновить статус клиента" },
         { status: 500 },

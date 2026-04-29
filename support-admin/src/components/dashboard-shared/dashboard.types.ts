@@ -14,7 +14,7 @@ export type Message = {
   } | null;
 };
 
-export type WorkflowStatus = "new" | "in_progress" | "waiting_client" | "completed";
+export type WorkflowStatus = "new" | "in_progress" | "completed";
 
 export type PriorityLabel = "high" | "medium" | "low";
 

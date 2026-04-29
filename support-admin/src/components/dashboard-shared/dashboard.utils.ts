@@ -104,10 +104,8 @@ function getWorkflowStatusOrder(status: WorkflowStatus) {
       return 0;
     case "in_progress":
       return 1;
-    case "waiting_client":
-      return 2;
     case "completed":
-      return 3;
+      return 2;
     default:
       return 99;
   }

@@ -22,7 +22,7 @@ type SaveIncomingMessageResult = {
   messageId: number | null;
 };
 
-type WorkflowStatus = "new" | "in_progress" | "waiting_client" | "completed";
+type WorkflowStatus = "new" | "in_progress" | "completed";
 
 type ClientAssignmentState = {
   workflowStatus: WorkflowStatus;
@@ -135,10 +135,6 @@ function getNextWorkflowStatusOnIncomingMessage(
 ): WorkflowStatus {
   if (currentStatus === "completed") {
     return "new";
-  }
-
-  if (currentStatus === "waiting_client") {
-    return "in_progress";
   }
 
   return currentStatus;

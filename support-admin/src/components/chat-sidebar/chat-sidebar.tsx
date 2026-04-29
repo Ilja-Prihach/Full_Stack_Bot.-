@@ -75,8 +75,6 @@ function getWorkflowFilterLabel(filter: ChatWorkflowFilter) {
       return "Новые";
     case "in_progress":
       return "В работе";
-    case "waiting_client":
-      return "Ждут клиента";
     case "completed":
       return "Завершённые";
     default:
@@ -103,10 +101,8 @@ function getWorkflowStatusLabel(status: WorkflowStatus) {
       return "Новый";
     case "in_progress":
       return "В работе";
-    case "waiting_client":
-      return "Ждёт клиента";
     case "completed":
-      return "Завершён";
+      return "Не в работе";
     default:
       return "Новый";
   }
@@ -291,7 +287,7 @@ export function ChatSidebar({
                 По статусу
               </div>
               <div className="space-y-1">
-                {(["all", "new", "in_progress", "waiting_client", "completed"] as const).map((filter) => (
+                {(["all", "new", "in_progress", "completed"] as const).map((filter) => (
                   <button
                     key={filter}
                     type="button"
