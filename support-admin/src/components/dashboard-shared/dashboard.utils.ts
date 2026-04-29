@@ -7,10 +7,13 @@ import type {
   WorkflowStatus,
 } from "./dashboard.types";
 
+const DASHBOARD_TIME_ZONE = "Europe/Minsk";
+
 export function formatTime(timestamp: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: DASHBOARD_TIME_ZONE,
   }).format(new Date(timestamp));
 }
 
