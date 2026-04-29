@@ -219,7 +219,7 @@ export function ChatSidebar({
               </span>
             </summary>
 
-            <div className={`${styles.filterPopover} absolute left-0 top-[calc(100%+0.5rem)] z-20 w-72 rounded-[20px] p-3 shadow-2xl`}>
+            <div className={`${styles.filterPopover} message-scrollbar absolute left-0 top-[calc(100%+0.5rem)] z-20 w-72 rounded-[20px] p-3 shadow-2xl`}>
               <div className="space-y-1">
                 <button
                   type="button"

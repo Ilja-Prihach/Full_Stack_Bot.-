@@ -34,6 +34,9 @@
 .filterPopover {
   border: 1px solid var(--line);
   background: var(--card);
+  max-height: min(32rem, calc(100vh - 10rem));
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .filterOption {
