@@ -9,8 +9,10 @@ export type {
   ManagerProfile,
   ManagerStatusRecord,
   Message,
+  PriorityLabel,
   TeamMessage,
   TeamReadState,
+  WorkflowStatus,
 } from "./dashboard.types";
 export {
   formatTime,

@@ -9,6 +9,7 @@ import type {
   ManagerProfile,
   Message,
   TeamMessage,
+  WorkflowStatus,
 } from "../dashboard-shared";
 import { formatTime, getManagerStatusMeta } from "../dashboard-shared";
 import styles from "./message-panel.module.css";
@@ -35,6 +36,44 @@ function getTeamMessageSenderName(message: TeamMessage, managers: ManagerProfile
   return computedName || message.sender_name || "Менеджер";
 }
 
+function getWorkflowStatusLabel(status: WorkflowStatus) {
+  switch (status) {
+    case "in_progress":
+      return "В работе";
+    case "waiting_client":
+      return "Ждёт клиента";
+    case "completed":
+      return "Завершён";
+    default:
+      return "Новый";
+  }
+}
+
+function getPriorityLabel(priority: ClientAssignment["priority_label"]) {
+  switch (priority) {
+    case "high":
+      return "High";
+    case "medium":
+      return "Medium";
+    default:
+      return "Low";
+  }
+}
+
+function getAiStateLabel(assignment: ClientAssignment | null) {
+  const workflowStatus = assignment?.workflow_status ?? "new";
+  const aiEnabled = assignment?.ai_auto_reply_enabled ?? true;
+  const workflowLabel = getWorkflowStatusLabel(workflowStatus);
+
+  if (workflowStatus === "new") {
+    return aiEnabled
+      ? `${workflowLabel} · ИИ включён`
+      : `${workflowLabel} · ИИ выключен вручную`;
+  }
+
+  return `${workflowLabel} · ИИ отключён по статусу`;
+}
+
 export function MessagePanel({
   selectedChat,
   messages,
@@ -52,15 +91,20 @@ export function MessagePanel({
   const [sendError, setSendError] = useState<string | null>(null);
   const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const [aiToggleError, setAiToggleError] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
   const [isHydrated, setIsHydrated] = useState(false);
   const [isSending, startSending] = useTransition();
   const [isAssigning, startAssigning] = useTransition();
   const [isTogglingAi, startTogglingAi] = useTransition();
+  const [isUpdatingStatus, startUpdatingStatus] = useTransition();
 
   const assignedManager =
     assignment?.assigned_manager_id != null
       ? managers.find((manager) => manager.id === assignment.assigned_manager_id) ?? null
       : null;
+  const workflowStatus = assignment?.workflow_status ?? "new";
+  const priorityLabel = assignment?.priority_label ?? "low";
+  const priorityReason = assignment?.priority_reason ?? null;
   const selectedChatMeta = selectedChat
     ? [
         selectedChat.subtitle || null,
@@ -291,6 +335,37 @@ export function MessagePanel({
     });
   }
 
+  function handleWorkflowStatusChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const nextStatus = event.target.value as WorkflowStatus;
+
+    if (!selectedChat) {
+      return;
+    }
+
+    setStatusError(null);
+
+    startUpdatingStatus(async () => {
+      const response = await fetch(`/api/clients/${selectedChat.clientId}/workflow-status`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: nextStatus,
+        }),
+      });
+
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok || payload.ok === false) {
+        setStatusError(payload.error ?? "Не удалось обновить статус");
+        return;
+      }
+
+      router.refresh();
+    });
+  }
+
   return (
     <section className={`${styles.mainPanel} min-w-0 overflow-hidden rounded-[24px] border lg:min-h-0 lg:rounded-[28px]`}>
       <div className="flex min-w-0 flex-col lg:h-full lg:min-h-0">
@@ -314,7 +389,14 @@ export function MessagePanel({
 
             {!isTeamChatActive && (
             <div className="min-w-0 lg:w-[500px]">
-              <div className="flex flex-nowrap items-center justify-end gap-2 overflow-x-auto pb-1">
+              <div className="flex flex-wrap items-center justify-end gap-2 pb-1">
+                <span className={`${styles.assignmentBadge} shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium`}>
+                  {getWorkflowStatusLabel(workflowStatus)}
+                </span>
+                <span className={`${priorityLabel === "high" ? "bg-red-100 text-red-700" : priorityLabel === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"} shrink-0 rounded-full px-2.5 py-1 text-[11px] font-medium`}>
+                  Приоритет: {getPriorityLabel(priorityLabel)}
+                </span>
+
                 <div className="flex shrink-0 items-center gap-2">
                   <span className={`${styles.muted} text-[11px] font-medium uppercase tracking-[0.08em]`}>
                     Ответственный
@@ -323,6 +405,20 @@ export function MessagePanel({
                     {assignedManager ? formatManagerName(assignedManager) : "Не назначен"}
                   </span>
                 </div>
+
+                <label className="w-[170px] shrink-0">
+                  <select
+                    value={workflowStatus}
+                    onChange={handleWorkflowStatusChange}
+                    disabled={!selectedChat || isUpdatingStatus}
+                    className={`${styles.assignmentSelect} w-full rounded-xl px-3 py-2 text-sm outline-none`}
+                  >
+                    <option value="new">Новый</option>
+                    <option value="in_progress">В работе</option>
+                    <option value="waiting_client">Ждёт клиента</option>
+                    <option value="completed">Завершён</option>
+                  </select>
+                </label>
 
                 <label className="w-[210px] shrink-0">
                   <select
@@ -354,11 +450,10 @@ export function MessagePanel({
                 </button>
               </div>
 
-              {(assignmentError || aiToggleError) ? (
-                <div className={`${styles.muted} mt-1 min-h-[16px] truncate text-right text-[11px]`}>
-                  {assignmentError ?? aiToggleError}
-                </div>
-              ) : null}
+              <div className={`${styles.muted} mt-1 min-h-[16px] text-right text-[11px]`}>
+                {assignmentError ?? aiToggleError ?? statusError ?? getAiStateLabel(assignment)}
+                {priorityReason ? ` · ${priorityReason}` : ""}
+              </div>
             </div>
             )}
           </div>
