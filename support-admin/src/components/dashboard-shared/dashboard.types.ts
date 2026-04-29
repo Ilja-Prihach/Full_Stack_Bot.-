@@ -27,6 +27,11 @@ export type ChatPreview = {
   lastTimestamp: string;
   totalMessages: number;
   unreadCount: number;
+  workflowStatus: WorkflowStatus;
+  priorityScore: number;
+  priorityLabel: PriorityLabel;
+  priorityReason: string | null;
+  isAssigned: boolean;
 };
 
 export type ManagerProfile = {
@@ -78,6 +83,10 @@ export type ChatAssignmentFilter =
   | "unassigned"
   | "mine"
   | `manager:${number}`;
+
+export type ChatWorkflowFilter = "all" | WorkflowStatus;
+
+export type ChatPriorityFilter = "all" | PriorityLabel;
 
 export type TeamMessage = {
   id: number;

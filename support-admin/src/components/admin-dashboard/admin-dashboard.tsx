@@ -9,6 +9,8 @@ import { KnowledgeBase } from "../knowledge-base";
 import type {
   AdminDashboardProps,
   ChatAssignmentFilter,
+  ChatPriorityFilter,
+  ChatWorkflowFilter,
   ManagerAvailabilityStatus,
   ManagerDisplayStatus,
 } from "../dashboard-shared";
@@ -51,6 +53,8 @@ export function AdminDashboard({
   const [isTeamChatActive, setIsTeamChatActive] = useState(true);
   const [isKnowledgeBaseActive, setIsKnowledgeBaseActive] = useState(false);
   const [assignmentFilter, setAssignmentFilter] = useState<ChatAssignmentFilter>("all");
+  const [workflowFilter, setWorkflowFilter] = useState<ChatWorkflowFilter>("all");
+  const [priorityFilter, setPriorityFilter] = useState<ChatPriorityFilter>("all");
   const [managerStatusOverrides, setManagerStatusOverrides] = useState(
     () => new Map<number, ManagerAvailabilityStatus | null>(),
   );
@@ -64,7 +68,7 @@ export function AdminDashboard({
   const presenceKeyRef = useRef<string | null>(null);
   const deferredSearchQuery = useDeferredValue(searchQuery);
   const normalizedQuery = deferredSearchQuery.trim().toLowerCase();
-  const chatPreviews = getChatPreviews(initialMessages, readStates);
+  const chatPreviews = getChatPreviews(initialMessages, readStates, assignments);
   const assignmentsByClientId = new Map(
     assignments.map((assignment) => [assignment.client_id, assignment]),
   );
@@ -109,6 +113,14 @@ export function AdminDashboard({
         assignment?.assigned_manager_id === Number(assignmentFilter.split(":")[1]));
 
     if (!passesAssignmentFilter) {
+      return false;
+    }
+
+    if (workflowFilter !== "all" && chat.workflowStatus !== workflowFilter) {
+      return false;
+    }
+
+    if (priorityFilter !== "all" && chat.priorityLabel !== priorityFilter) {
       return false;
     }
 
@@ -461,6 +473,8 @@ export function AdminDashboard({
                 activeClientId={activeClientId}
                 searchQuery={searchQuery}
                 assignmentFilter={assignmentFilter}
+                workflowFilter={workflowFilter}
+                priorityFilter={priorityFilter}
                 currentManager={currentManager}
                 managers={managers}
                 managerStatuses={managerDisplayStatuses}
@@ -469,6 +483,8 @@ export function AdminDashboard({
                 teamReadState={teamReadState}
                 onSearchChange={setSearchQuery}
                 onAssignmentFilterChange={setAssignmentFilter}
+                onWorkflowFilterChange={setWorkflowFilter}
+                onPriorityFilterChange={setPriorityFilter}
                 onSelectChat={(clientId) => {
                   setIsTeamChatActive(false);
                   setSelectedClientId(clientId);

@@ -3,11 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import type {
   ChatAssignmentFilter,
+  ChatPriorityFilter,
   ChatPreview,
+  ChatWorkflowFilter,
   ManagerDisplayStatus,
   ManagerProfile,
   TeamMessage,
   TeamReadState,
+  WorkflowStatus,
 } from "../dashboard-shared";
 import { formatTime, getManagerStatusMeta } from "../dashboard-shared";
 import styles from "./chat-sidebar.module.css";
@@ -17,6 +20,8 @@ type ChatSidebarProps = {
   activeClientId: number | null;
   searchQuery: string;
   assignmentFilter: ChatAssignmentFilter;
+  workflowFilter: ChatWorkflowFilter;
+  priorityFilter: ChatPriorityFilter;
   currentManager: ManagerProfile | null;
   managers: ManagerProfile[];
   managerStatuses: Map<number, ManagerDisplayStatus>;
@@ -25,6 +30,8 @@ type ChatSidebarProps = {
   teamReadState: TeamReadState | null;
   onSearchChange: (value: string) => void;
   onAssignmentFilterChange: (filter: ChatAssignmentFilter) => void;
+  onWorkflowFilterChange: (filter: ChatWorkflowFilter) => void;
+  onPriorityFilterChange: (filter: ChatPriorityFilter) => void;
   onSelectChat: (clientId: number) => void;
   onSelectTeamChat: () => void;
 };
@@ -62,11 +69,56 @@ function getFilterLabel(
   return "Все чаты";
 }
 
+function getWorkflowFilterLabel(filter: ChatWorkflowFilter) {
+  switch (filter) {
+    case "new":
+      return "Новые";
+    case "in_progress":
+      return "В работе";
+    case "waiting_client":
+      return "Ждут клиента";
+    case "completed":
+      return "Завершённые";
+    default:
+      return "Все статусы";
+  }
+}
+
+function getPriorityFilterLabel(filter: ChatPriorityFilter) {
+  switch (filter) {
+    case "high":
+      return "High";
+    case "medium":
+      return "Medium";
+    case "low":
+      return "Low";
+    default:
+      return "Все приоритеты";
+  }
+}
+
+function getWorkflowStatusLabel(status: WorkflowStatus) {
+  switch (status) {
+    case "new":
+      return "Новый";
+    case "in_progress":
+      return "В работе";
+    case "waiting_client":
+      return "Ждёт клиента";
+    case "completed":
+      return "Завершён";
+    default:
+      return "Новый";
+  }
+}
+
 export function ChatSidebar({
   chats,
   activeClientId,
   searchQuery,
   assignmentFilter,
+  workflowFilter,
+  priorityFilter,
   currentManager,
   managers,
   managerStatuses,
@@ -75,6 +127,8 @@ export function ChatSidebar({
   teamReadState,
   onSearchChange,
   onAssignmentFilterChange,
+  onWorkflowFilterChange,
+  onPriorityFilterChange,
   onSelectChat,
   onSelectTeamChat,
 }: ChatSidebarProps) {
@@ -116,10 +170,27 @@ export function ChatSidebar({
 
   function applyAssignmentFilter(filter: ChatAssignmentFilter) {
     onAssignmentFilterChange(filter);
+  }
 
+  function closeFilterMenu() {
     if (filterMenuRef.current) {
       filterMenuRef.current.open = false;
     }
+  }
+
+  function applyWorkflowFilter(filter: ChatWorkflowFilter) {
+    onWorkflowFilterChange(filter);
+    closeFilterMenu();
+  }
+
+  function applyPriorityFilter(filter: ChatPriorityFilter) {
+    onPriorityFilterChange(filter);
+    closeFilterMenu();
+  }
+
+  function applyAssignmentFilterAndClose(filter: ChatAssignmentFilter) {
+    applyAssignmentFilter(filter);
+    closeFilterMenu();
   }
 
   function getTeamMessageSenderName(message: TeamMessage) {
@@ -156,7 +227,7 @@ export function ChatSidebar({
               <div className="space-y-1">
                 <button
                   type="button"
-                  onClick={() => applyAssignmentFilter("all")}
+                  onClick={() => applyAssignmentFilterAndClose("all")}
                   className={`${styles.filterOption} ${
                     assignmentFilter === "all" ? styles.filterOptionActive : ""
                   } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
@@ -165,7 +236,7 @@ export function ChatSidebar({
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyAssignmentFilter("unread")}
+                  onClick={() => applyAssignmentFilterAndClose("unread")}
                   className={`${styles.filterOption} ${
                     assignmentFilter === "unread" ? styles.filterOptionActive : ""
                   } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
@@ -174,7 +245,7 @@ export function ChatSidebar({
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyAssignmentFilter("unassigned")}
+                  onClick={() => applyAssignmentFilterAndClose("unassigned")}
                   className={`${styles.filterOption} ${
                     assignmentFilter === "unassigned" ? styles.filterOptionActive : ""
                   } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
@@ -183,7 +254,7 @@ export function ChatSidebar({
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyAssignmentFilter("mine")}
+                  onClick={() => applyAssignmentFilterAndClose("mine")}
                   className={`${styles.filterOption} ${
                     assignmentFilter === "mine" ? styles.filterOptionActive : ""
                   } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
@@ -204,7 +275,7 @@ export function ChatSidebar({
                     <button
                       key={manager.id}
                       type="button"
-                      onClick={() => applyAssignmentFilter(filterValue)}
+                      onClick={() => applyAssignmentFilterAndClose(filterValue)}
                       className={`${styles.filterOption} ${
                         assignmentFilter === filterValue ? styles.filterOptionActive : ""
                       } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
@@ -214,6 +285,42 @@ export function ChatSidebar({
                     </button>
                   );
                 })}
+              </div>
+
+              <div className={`${styles.muted} mt-3 mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                По статусу
+              </div>
+              <div className="space-y-1">
+                {(["all", "new", "in_progress", "waiting_client", "completed"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => applyWorkflowFilter(filter)}
+                    className={`${styles.filterOption} ${
+                      workflowFilter === filter ? styles.filterOptionActive : ""
+                    } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
+                  >
+                    {getWorkflowFilterLabel(filter)}
+                  </button>
+                ))}
+              </div>
+
+              <div className={`${styles.muted} mt-3 mb-2 px-1 text-[11px] font-medium uppercase tracking-[0.08em]`}>
+                По приоритету
+              </div>
+              <div className="space-y-1">
+                {(["all", "high", "medium", "low"] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    onClick={() => applyPriorityFilter(filter)}
+                    className={`${styles.filterOption} ${
+                      priorityFilter === filter ? styles.filterOptionActive : ""
+                    } w-full rounded-2xl px-3 py-2 text-left text-sm transition`}
+                  >
+                    {getPriorityFilterLabel(filter)}
+                  </button>
+                ))}
               </div>
             </div>
           </details>
@@ -365,6 +472,24 @@ export function ChatSidebar({
                         </div>
                       </div>
                       <div className="mt-3 truncate text-sm">{chat.lastMessage}</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-medium text-sky-700">
+                          {getWorkflowStatusLabel(chat.workflowStatus)}
+                        </span>
+                        <span className={`${chat.priorityLabel === "high" ? "bg-red-100 text-red-700" : chat.priorityLabel === "medium" ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"} rounded-full px-2 py-0.5 text-[10px] font-medium`}>
+                          {chat.priorityLabel.toUpperCase()}
+                        </span>
+                        {!chat.isAssigned ? (
+                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                            Без назначения
+                          </span>
+                        ) : null}
+                      </div>
+                      {chat.priorityReason ? (
+                        <div className={`${styles.muted} mt-2 truncate text-xs`}>
+                          {chat.priorityReason}
+                        </div>
+                      ) : null}
                       {chat.telegramChatId ? (
                         <div className={`${styles.muted} mt-2 truncate text-xs`}>
                           Telegram chat: {chat.telegramChatId}

@@ -1,4 +1,11 @@
-import type { ChatPreview, ClientReadState, ManagerDisplayStatus, Message } from "./dashboard.types";
+import type {
+  ChatPreview,
+  ClientAssignment,
+  ClientReadState,
+  ManagerDisplayStatus,
+  Message,
+  WorkflowStatus,
+} from "./dashboard.types";
 
 export function formatTime(timestamp: string) {
   return new Intl.DateTimeFormat("ru-RU", {
@@ -87,9 +94,39 @@ function getChatIdentity(chatMessages: Message[]) {
   };
 }
 
-export function getChatPreviews(messages: Message[], readStates: ClientReadState[] = []) {
+function getWorkflowStatusOrder(status: WorkflowStatus) {
+  switch (status) {
+    case "new":
+      return 0;
+    case "in_progress":
+      return 1;
+    case "waiting_client":
+      return 2;
+    case "completed":
+      return 3;
+    default:
+      return 99;
+  }
+}
+
+function getLatestClientMessageTimestamp(chatMessages: Message[]) {
+  return (
+    chatMessages.find((message) => message.sender_type === "client")?.created_at ??
+    chatMessages[0]?.created_at ??
+    null
+  );
+}
+
+export function getChatPreviews(
+  messages: Message[],
+  readStates: ClientReadState[] = [],
+  assignments: ClientAssignment[] = [],
+) {
   const byChat = new Map<number, Message[]>();
   const readStateByClientId = new Map(readStates.map((readState) => [readState.client_id, readState]));
+  const assignmentsByClientId = new Map(
+    assignments.map((assignment) => [assignment.client_id, assignment]),
+  );
 
   for (const message of messages) {
     const existing = byChat.get(message.client_id) ?? [];
@@ -102,6 +139,13 @@ export function getChatPreviews(messages: Message[], readStates: ClientReadState
   for (const [clientId, chatMessages] of byChat.entries()) {
     const latestMessage = chatMessages[0];
     const identity = getChatIdentity(chatMessages);
+    const assignment = assignmentsByClientId.get(clientId) ?? null;
+    const workflowStatus = assignment?.workflow_status ?? "new";
+    const priorityScore = assignment?.priority_score ?? 0;
+    const priorityLabel = assignment?.priority_label ?? "low";
+    const priorityReason = assignment?.priority_reason ?? null;
+    const lastClientTimestamp =
+      assignment?.last_client_message_at ?? getLatestClientMessageTimestamp(chatMessages);
 
     previews.push({
       clientId,
@@ -111,6 +155,11 @@ export function getChatPreviews(messages: Message[], readStates: ClientReadState
       lastMessage: latestMessage.text,
       lastTimestamp: latestMessage.created_at,
       totalMessages: chatMessages.length,
+      workflowStatus,
+      priorityScore,
+      priorityLabel,
+      priorityReason,
+      isAssigned: assignment?.assigned_manager_id != null,
       unreadCount: chatMessages.filter((message) => {
         if (message.sender_type !== "client") {
           return false;
@@ -125,12 +174,34 @@ export function getChatPreviews(messages: Message[], readStates: ClientReadState
         return Number(message.id) > readState.last_read_message_id;
       }).length,
     });
+
+    if (lastClientTimestamp) {
+      previews[previews.length - 1].lastTimestamp = lastClientTimestamp;
+    }
   }
 
-  previews.sort(
-    (left, right) =>
-      new Date(right.lastTimestamp).getTime() - new Date(left.lastTimestamp).getTime(),
-  );
+  previews.sort((left, right) => {
+    const statusDiff =
+      getWorkflowStatusOrder(left.workflowStatus) - getWorkflowStatusOrder(right.workflowStatus);
+
+    if (statusDiff !== 0) {
+      return statusDiff;
+    }
+
+    const assignmentDiff = Number(left.isAssigned) - Number(right.isAssigned);
+
+    if (assignmentDiff !== 0) {
+      return assignmentDiff;
+    }
+
+    const priorityDiff = right.priorityScore - left.priorityScore;
+
+    if (priorityDiff !== 0) {
+      return priorityDiff;
+    }
+
+    return new Date(right.lastTimestamp).getTime() - new Date(left.lastTimestamp).getTime();
+  });
 
   return previews;
 }
