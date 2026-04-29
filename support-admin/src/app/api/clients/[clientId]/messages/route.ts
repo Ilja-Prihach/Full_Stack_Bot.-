@@ -135,6 +135,30 @@ async function sendTelegramMessage(chatId: number, text: string) {
   }
 }
 
+async function syncClientWorkflowAfterManagerReply(
+  supabase: SupabaseClient,
+  clientId: number,
+) {
+  const now = new Date().toISOString();
+
+  const { error } = await supabase.from("client_assignments").upsert(
+    {
+      client_id: clientId,
+      workflow_status: "in_progress",
+      last_manager_message_at: now,
+      status_updated_at: now,
+      updated_at: now,
+    },
+    {
+      onConflict: "client_id",
+    },
+  );
+
+  if (error) {
+    throw createRouteError("Не удалось обновить статус клиента", 500);
+  }
+}
+
 export async function POST(
   request: Request,
   context: { params: Promise<{ clientId: string }> },
@@ -165,6 +189,8 @@ export async function POST(
         { status: 500 },
       );
     }
+
+    await syncClientWorkflowAfterManagerReply(supabase, client.id);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
