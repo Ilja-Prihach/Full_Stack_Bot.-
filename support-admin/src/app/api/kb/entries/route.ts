@@ -174,8 +174,9 @@ export async function POST(request: Request) {
       .single();
 
     if (error || !data) {
+      console.error("Failed to create KB entry:", error);
       return NextResponse.json(
-        { ok: false, error: "Не удалось создать статью базы знаний" },
+        { ok: false, error: error?.message ?? "Не удалось создать статью базы знаний" },
         { status: 500 },
       );
     }
@@ -208,6 +209,8 @@ export async function POST(request: Request) {
       });
     }
   } catch (error) {
+    console.error("Unhandled error while creating KB entry:", error);
+
     if (isRouteError(error)) {
       return NextResponse.json(
         { ok: false, error: error.error },
