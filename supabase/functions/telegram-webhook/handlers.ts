@@ -378,55 +378,54 @@ const URGENCY_PATTERNS = [
 ];
 
 function normalizeMessageText(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ");
+}
+
+function matchesPattern(messageText: string, pattern: string) {
+  const normalized = normalizeMessageText(messageText);
+  const normalizedPattern = normalizeMessageText(pattern);
+
+  if (!normalized || !normalizedPattern) {
+    return false;
+  }
+
+  return ` ${normalized} `.includes(` ${normalizedPattern} `);
 }
 
 function isGreetingMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return GREETING_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return GREETING_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isGratitudeMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return GRATITUDE_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return GRATITUDE_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isFarewellMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return FAREWELL_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return FAREWELL_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isAgreementMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return AGREEMENT_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return AGREEMENT_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isApologyMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return APOLOGY_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return APOLOGY_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isManagerRequestMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return MANAGER_REQUEST_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return MANAGER_REQUEST_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isDeclineMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return DECLINE_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return DECLINE_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 function isUrgencyMessage(messageText: string) {
-  const normalized = normalizeMessageText(messageText);
-
-  return URGENCY_PATTERNS.some((pattern) => normalized.includes(pattern));
+  return URGENCY_PATTERNS.some((pattern) => matchesPattern(messageText, pattern));
 }
 
 async function sendAndStoreAiReply(clientId: number, chatId: number, replyText: string) {

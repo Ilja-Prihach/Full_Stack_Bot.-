@@ -32,6 +32,12 @@ type MatchKbEntryRow = {
   similarity: number;
 };
 
+type RankedKbEntryMatch = {
+  entry: KbEntry;
+  similarity: number;
+  score: number;
+};
+
 type OpenAiEmbeddingsResponse = {
   data?: Array<{
     embedding?: number[];
@@ -77,6 +83,66 @@ function formatVector(values: number[]) {
   return `[${values.join(",")}]`;
 }
 
+function normalizeText(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function tokenizeText(value: string) {
+  return normalizeText(value)
+    .split(/[^a-zA-Zа-яА-Я0-9]+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2);
+}
+
+function calculateKeywordBoost(messageText: string, entry: KbEntry) {
+  const normalizedMessage = normalizeText(messageText);
+  const questionText = normalizeText(entry.question);
+  const answerText = normalizeText(entry.answer);
+  const keywordTexts = (entry.keywords ?? []).map((keyword) => normalizeText(keyword));
+  const messageTokens = new Set(tokenizeText(messageText));
+  const answerTokens = new Set(tokenizeText(entry.answer));
+
+  let boost = 0;
+
+  if (questionText.includes(normalizedMessage) || normalizedMessage.includes(questionText)) {
+    boost += 0.08;
+  }
+
+  const matchedAnswerTokens = [...messageTokens].filter((token) => answerTokens.has(token)).length;
+
+  if (matchedAnswerTokens >= 2) {
+    boost += 0.06;
+  } else if (matchedAnswerTokens === 1) {
+    boost += 0.03;
+  }
+
+  if (
+    answerText.includes(normalizedMessage) ||
+    normalizedMessage.includes("привод") && answerText.includes("привод")
+  ) {
+    boost += 0.06;
+  }
+
+  for (const keyword of keywordTexts) {
+    if (!keyword) {
+      continue;
+    }
+
+    if (normalizedMessage.includes(keyword) || keyword.includes(normalizedMessage)) {
+      boost += 0.12;
+      continue;
+    }
+
+    const keywordTokens = tokenizeText(keyword);
+
+    if (keywordTokens.some((token) => messageTokens.has(token))) {
+      boost += 0.04;
+    }
+  }
+
+  return Math.min(boost, 0.2);
+}
+
 function buildFormattingPrompt(question: string, answer: string) {
   return [
     `Вопрос клиента: ${question}`,
@@ -113,7 +179,7 @@ async function createEmbedding(input: string) {
   return embedding;
 }
 
-async function searchRelevantEntries(messageText: string) {
+async function searchRelevantEntries(messageText: string): Promise<RankedKbEntryMatch[]> {
   const supabaseClient = requireAiConfig();
   const embedding = await createEmbedding(messageText);
 
@@ -128,16 +194,24 @@ async function searchRelevantEntries(messageText: string) {
 
   const rows = (data ?? []) as MatchKbEntryRow[];
 
-  return rows.map((row) => ({
-    entry: {
-      id: row.kb_entry_id,
-      question: row.question,
-      answer: row.answer,
-      keywords: row.keywords ?? [],
-      is_active: row.is_active,
-    },
-    similarity: row.similarity,
-  }));
+  return rows
+    .map((row) => {
+      const entry = {
+        id: row.kb_entry_id,
+        question: row.question,
+        answer: row.answer,
+        keywords: row.keywords ?? [],
+        is_active: row.is_active,
+      };
+      const score = row.similarity + calculateKeywordBoost(messageText, entry);
+
+      return {
+        entry,
+        similarity: row.similarity,
+        score,
+      };
+    })
+    .sort((left, right) => right.score - left.score);
 }
 
 async function formatAnswer(question: string, answer: string) {
@@ -206,11 +280,11 @@ export async function generateAutoReply(messageText: string): Promise<AutoReplyR
 
   const bestMatch = matches[0];
 
-  if (bestMatch.similarity < MIN_MATCH_SIMILARITY) {
+  if (bestMatch.score < MIN_MATCH_SIMILARITY) {
     return {
       shouldReply: false,
       answer: null,
-      confidence: bestMatch.similarity,
+      confidence: bestMatch.score,
       matchedEntryIds: matches.map((item) => item.entry.id),
       reason: "no_match",
     };
@@ -227,7 +301,7 @@ export async function generateAutoReply(messageText: string): Promise<AutoReplyR
   return {
     shouldReply: true,
     answer,
-    confidence: bestMatch.similarity,
+    confidence: bestMatch.score,
     matchedEntryIds: matches.map((item) => item.entry.id),
     reason: "match_found",
   };

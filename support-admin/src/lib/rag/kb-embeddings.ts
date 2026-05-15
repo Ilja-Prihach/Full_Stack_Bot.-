@@ -22,9 +22,11 @@ function buildEmbeddingSourceText(entry: KbEntryEmbeddingPayload) {
   const keywords = entry.keywords.length > 0 ? entry.keywords.join(", ") : "нет";
 
   return [
-    `Вопрос: ${entry.question}`,
-    `Ответ: ${entry.answer}`,
+    `Основной вопрос: ${entry.question}`,
     `Ключевые слова: ${keywords}`,
+    `Краткая тема: ${entry.question}`,
+    `Синонимы и ключевые слова: ${keywords}`,
+    `Ответ: ${entry.answer}`,
   ].join("\n");
 }
 
