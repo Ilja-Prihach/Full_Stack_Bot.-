@@ -11,9 +11,10 @@ participant "Telegram" as telegram
 participant "telegram-webhook" as webhook
 database "public.clients" as clients
 database "public.messages" as messages
+database "public.client_assignments" as assignments
 participant "Admin UI" as ui
 
-tg_user -> telegram : Отправляет первое сообщение
+tg_user -> telegram : Отправляет сообщение
 telegram -> webhook : Присылает webhook update\nmessage, chat, user
 webhook -> clients : Ищет клиента по telegram_chat_id\nили telegram_user_id
 
@@ -27,10 +28,23 @@ end
 
 webhook -> messages : Создаёт сообщение\nclient_id, sender_type = client,\nsender_manager_id = NULL,\nsender_label = username/first_name,\ntext, created_at = now()
 messages --> webhook : Сообщение сохранено
+
+webhook -> assignments : Читает workflow_status\nи ai_auto_reply_enabled
+assignments --> webhook : Operational state клиента
+webhook -> assignments : UPSERT\nlast_client_message_at = now()
+
+alt Статус был completed
+  webhook -> assignments : Переводит workflow_status\ncompleted -> new
+else Статус уже new/in_progress\nили записи ещё нет
+  webhook -> assignments : Оставляет текущий статус\nили создаёт запись по умолчанию
+end
+
 webhook --> telegram : 200 OK
 
 ui -> clients : Запрашивает список чатов
 clients --> ui : Клиенты для боковой панели
+ui -> assignments : Запрашивает assignee,\nworkflow_status,\npriority_mode и effective priority
+assignments --> ui : Operational state клиента
 ui -> messages : Запрашивает сообщения по client_id
 messages --> ui : История переписки
 

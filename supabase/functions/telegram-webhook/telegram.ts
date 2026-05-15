@@ -30,7 +30,11 @@ export function extractTelegramMessage(update: any): TelegramMessageData {
 }
 
 export async function sendTelegramMessage(chatId: number, text: string) {
-  return await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+  if (!TELEGRAM_BOT_TOKEN) {
+    throw new Error("TELEGRAM_BOT_TOKEN is not configured");
+  }
+
+  const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -40,4 +44,12 @@ export async function sendTelegramMessage(chatId: number, text: string) {
       text,
     }),
   });
+
+  const payload = await response.json();
+
+  if (!response.ok || payload?.ok === false) {
+    throw new Error(payload?.description ?? "Failed to send message to Telegram");
+  }
+
+  return payload;
 }

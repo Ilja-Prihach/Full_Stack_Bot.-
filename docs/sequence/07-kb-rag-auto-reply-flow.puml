@@ -11,123 +11,101 @@ participant "Telegram" as telegram
 participant "telegram-webhook" as webhook
 database "public.clients" as clients
 database "public.messages" as messages
+database "public.client_assignments" as assignments
 database "public.ai_daily_usage" as daily_usage
 database "public.ai_reply_events" as reply_events
-participant "support-admin /api/ai/auto-reply" as ai_api
-participant "RAG pipeline" as rag
+participant "webhook handlers.ts" as handlers
+participant "webhook ai.ts" as ai_layer
 database "public.kb_entries" as kb_entries
 database "public.kb_embeddings" as kb_embeddings
 participant "OpenAI API" as openai
 participant "Admin UI" as ui
+participant "Support Admin KB API" as kb_api
 
 tg_user -> telegram : Отправляет сообщение в бот
 telegram -> webhook : Webhook update\nchat, user, text
 
 webhook -> clients : Ищет или создаёт клиента
 clients --> webhook : client_id
+webhook -> assignments : Читает ai_auto_reply_enabled\nи workflow_status
+assignments --> webhook : Текущее состояние клиента
 
 webhook -> messages : Сохраняет входящее сообщение\nsender_type = client
 messages --> webhook : source_message_id
+webhook -> assignments : Обновляет\nlast_client_message_at = now()
 
-alt Сообщение не текстовое
-  webhook -> reply_events : Пишет событие\nreply_type = none\ndecision = ignored_non_text
-  webhook --> telegram : 200 OK без ответа
-else Текстовое сообщение
-  webhook -> webhook : Проверка длины текста
+alt Статус был completed
+  webhook -> assignments : completed -> new
+end
 
-  alt Сообщение слишком длинное
-    webhook -> telegram : Отправляет fallback\n"Запрос передан менеджеру"
-    webhook -> reply_events : Пишет событие\ndecision = fallback_too_long
-    webhook --> telegram : 200 OK
-  else Длина допустима
-    webhook -> webhook : Проверка rate-limit\n1 авто-ответ / 30 сек
+alt AI выключен по workflow_status или manual toggle
+  webhook --> telegram : 200 OK без авто-ответа
+else AI разрешён
+  webhook -> handlers : handleIncomingTextMessage(...)
 
-    alt Rate-limit нарушен
-      webhook -> reply_events : Пишет событие\ndecision = ignored_rate_limited
-      webhook --> telegram : 200 OK без ответа
-    else Rate-limit пройден
-      webhook -> webhook : Проверка greeting
+  alt Сообщение не текстовое
+    handlers -> reply_events : Пишет событие\nreply_type = none\ndecision = ignored_non_text
+    webhook --> telegram : 200 OK без ответа
+  else Текстовое сообщение
+    handlers -> handlers : Проверка длины,\nлимитов и canned intents
 
-      alt Greeting распознан
-        webhook -> daily_usage : Проверяет usage за сегодня
-        daily_usage --> webhook : reply_count
+    alt Greeting или canned reply распознан
+      handlers -> daily_usage : Проверяет usage за сегодня
+      daily_usage --> handlers : reply_count
+      handlers -> telegram : Отправляет canned reply
+      handlers -> messages : Сохраняет ответ\nsender_type = ai_bot
+      handlers -> daily_usage : Увеличивает reply_count
+      handlers -> reply_events : Пишет событие\nнапример greeting_sent,\nmanager_request_sent,\nurgency_sent
+      webhook --> telegram : 200 OK
+    else Нужен KB + RAG путь
+      handlers -> ai_layer : generateAutoReply(messageText)
 
-        alt Дневной лимит исчерпан
-          webhook -> telegram : Отправляет fallback\n"Скоро ответит менеджер"
-          webhook -> reply_events : Пишет событие\ndecision = fallback_limit_reached
-        else Лимит не исчерпан
-          webhook -> telegram : Отправляет greeting
-          webhook -> messages : Сохраняет ответ\nsender_type = ai_bot
-          webhook -> daily_usage : Увеличивает reply_count
-          webhook -> reply_events : Пишет событие\ndecision = greeting_sent
-        end
+      ai_layer -> openai : Создаёт embedding вопроса
+      openai --> ai_layer : query_embedding
 
-        webhook --> telegram : 200 OK
-      else Не greeting
-        webhook -> daily_usage : Проверяет usage за сегодня
-        daily_usage --> webhook : reply_count
+      ai_layer -> kb_embeddings : RPC match_kb_entries\nпо query_embedding
+      kb_embeddings --> ai_layer : candidate kb_entry_id + similarity
+      ai_layer -> kb_entries : Загружает статьи\nпо matched ids
+      kb_entries --> ai_layer : Контекст для ответа
 
-        alt Дневной лимит исчерпан
-          webhook -> telegram : Отправляет fallback\n"Скоро ответит менеджер"
-          webhook -> reply_events : Пишет событие\ndecision = fallback_limit_reached
-          webhook --> telegram : 200 OK
-        else Лимит не исчерпан
-          webhook -> ai_api : POST /api/ai/auto-reply\nmessageText, clientId, sourceMessageId
-
-          ai_api -> rag : generateAiReply(messageText)
-          rag -> openai : Создать embedding вопроса
-          openai --> rag : query_embedding
-
-          rag -> kb_embeddings : Vector search top-k
-          kb_embeddings --> rag : candidate kb_entry_id + similarity
-          rag -> kb_entries : Загружает активные статьи
-          kb_entries --> rag : Контекст для ответа
-
-          alt Лучший match ниже порога
-            rag --> ai_api : shouldReply = false\nreason = low_confidence
-          else Match найден
-            rag -> openai : Генерирует ответ\nтолько по KB контексту
-            openai --> rag : answer
-            rag --> ai_api : shouldReply = true\nanswer, confidence, matchedEntryIds
-          end
-
-          ai_api --> webhook : decision result
-
-          alt shouldReply = true
-            webhook -> telegram : Отправляет AI-ответ
-            webhook -> messages : Сохраняет ответ\nsender_type = ai_bot
-            webhook -> daily_usage : Увеличивает reply_count
-            webhook -> reply_events : Пишет событие\nconfidence, matchedEntryIds,\ndecision = ai_reply_sent
-          else shouldReply = false
-            webhook -> telegram : Отправляет fallback\n"Запрос передан менеджеру"
-            webhook -> reply_events : Пишет событие\nconfidence, decision = fallback_no_match
-          end
-
-          webhook --> telegram : 200 OK
-        end
+      alt Лучший match ниже порога
+        ai_layer --> handlers : shouldReply = false\nreason = no_match
+      else Match найден
+        ai_layer -> openai : Форматирует KB-ответ\nчерез Responses API
+        openai --> ai_layer : answer
+        ai_layer --> handlers : shouldReply = true\nanswer, confidence,\nmatchedEntryIds,\nreason = match_found
       end
+
+      alt shouldReply = true
+        handlers -> telegram : Отправляет AI-ответ
+        handlers -> messages : Сохраняет ответ\nsender_type = ai_bot
+        handlers -> daily_usage : Увеличивает reply_count
+        handlers -> reply_events : Пишет событие\nconfidence, matchedEntryIds,\ndecision = match_found
+      else shouldReply = false
+        handlers -> telegram : Отправляет fallback\n"Запрос передан менеджеру"
+        handlers -> reply_events : Пишет событие\nconfidence, decision = no_match
+      end
+
+      webhook --> telegram : 200 OK
     end
   end
 end
 
 == Управление базой знаний ==
 
-ui -> kb_entries : GET/POST/PATCH/DELETE статей
-ui -> kb_embeddings : Проверяет статус векторизации
-
-ui -> kb_entries : Создаёт или обновляет статью
-kb_entries --> ui : Статья сохранена
-ui -> ai_api : Запуск embedding refresh\nили отдельный KB endpoint
-ai_api -> openai : Создаёт embedding статьи
-openai --> ai_api : embedding
-ai_api -> kb_embeddings : Сохраняет embedding
-ai_api --> ui : status = embedding_ready
+ui -> kb_api : POST /api/kb/reindex\nили create/update entry
+kb_api -> kb_entries : Читает активные статьи\nили сохраняет изменения
+kb_entries --> kb_api : Статьи готовы к индексации
+kb_api -> openai : Создаёт embedding статьи
+openai --> kb_api : embedding
+kb_api -> kb_embeddings : Сохраняет embedding
+kb_api -> kb_entries : Обновляет status\nembedding_ready / embedding_failed
 
 == Отображение в админке ==
 
 ui -> messages : Запрашивает историю чата
 messages --> ui : client + manager + ai_bot сообщения
-ui -> reply_events : Опционально запрашивает AI audit
-reply_events --> ui : confidence, decision, matchedEntryIds
+ui -> assignments : Запрашивает workflow_status,\npriority, assignee и AI toggle
+assignments --> ui : Operational state клиента
 
 @enduml

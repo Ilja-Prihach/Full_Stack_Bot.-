@@ -23,89 +23,68 @@ actor "Support Manager" as SupportManager
 rectangle "Browser" as Browser
 rectangle "Telegram Bot API" as TelegramApi
 rectangle "Supabase Realtime\nWebSocket" as Realtime
-database "Supabase Postgres\nmessages, team_messages,\nmanager_statuses, read states,\nclients, managers, assignments" as MessagesDb
+rectangle "OpenAI API" as OpenAiApi
+database "Supabase Postgres\nchat tables + KB + AI tables" as SupportDb
 
 package "support-admin" as SupportAdmin {
   rectangle "page.tsx\nSSR entrypoint" as Page
   rectangle "supabase.ts\nSSR client + browser realtime" as FrontSupabase
-  rectangle "AdminDashboard\nsearch, selection,\nrealtime refresh,\npresence + status merge,\ntheme" as AdminDashboard
-  rectangle "dashboard-shared\nformat helpers,\nchat previews, types" as DashboardShared
-  rectangle "DashboardHero\nsummary header\nand status picker" as DashboardHero
-  rectangle "ChatSidebar\nchat list, search,\nmanager status list" as ChatSidebar
-  rectangle "MessagePanel\ndialog transcript,\nassignment, composer,\nread tracking" as MessagePanel
-  rectangle "reply route\n/api/clients/[clientId]/messages" as ReplyRoute
-  rectangle "assignment route\n/api/clients/[clientId]/assignment" as AssignmentRoute
-  rectangle "client read route\n/api/clients/[clientId]/read" as ClientReadRoute
-  rectangle "team chat routes\n/api/team-messages,\n/api/team-messages/read" as TeamChatRoutes
-  rectangle "manager status route\n/api/manager-status" as ManagerStatusRoute
+  rectangle "AdminDashboard\nchat shell, selection,\nrealtime refresh,\nfilters and workspace switching" as AdminDashboard
+  rectangle "KnowledgeBase\nKB workspace UI" as KnowledgeBaseUi
+  rectangle "dashboard-shared\ntypes, preview sorting,\npriority/status helpers" as DashboardShared
+  rectangle "DashboardHero\nheader, manager status,\nKB toggle" as DashboardHero
+  rectangle "ChatSidebar\nchat navigation,\nstatus/priority badges,\nfilters" as ChatSidebar
+  rectangle "MessagePanel\ntranscript,\nworkflow controls,\nmanual priority,\nassignment, AI toggle,\ncomposer, read tracking" as MessagePanel
+  rectangle "Chat API routes\nreply, assignment,\nworkflow status,\npriority, ai toggle,\nread, team chat,\nmanager status" as ChatRoutes
+  rectangle "KB API routes\n/api/kb/categories,\n/api/kb/entries,\n[id] PATCH/DELETE,\n/api/kb/reindex" as KbRoutes
+  rectangle "kb-embeddings.ts\nreindex + embedding helpers" as KbEmbeddings
 }
 
 package "telegram-webhook" as TelegramWebhook {
   rectangle "index.ts\nHTTP entrypoint" as WebhookIndex
-  rectangle "handlers.ts\n/start and inbound\nmessage flow" as WebhookHandlers
+  rectangle "handlers.ts\npre-checks, canned replies,\nlimits, fallback,\nRAG routing" as WebhookHandlers
+  rectangle "ai.ts\nKB search,\nOpenAI embedding,\nanswer formatting" as WebhookAi
   rectangle "telegram.ts\nupdate parsing,\nsendMessage wrapper" as WebhookTelegram
-  rectangle "messages.ts\nfindOrCreateClient,\ninsert inbound message" as WebhookMessages
+  rectangle "messages.ts\nclient lookup,\nmessage insert,\nworkflow state,\nai usage and events" as WebhookMessages
   rectangle "config.ts\nenvironment variables" as WebhookConfig
 }
-
-SupportManager -[hidden]-> Browser
-Browser -[hidden]-> Page
-Page -[hidden]-> FrontSupabase
-FrontSupabase -[hidden]-> MessagesDb
-FrontSupabase -[hidden]-> Realtime
-Page -[hidden]-> AdminDashboard
-AdminDashboard -[hidden]-> DashboardHero
-AdminDashboard -[hidden]-> ChatSidebar
-AdminDashboard -[hidden]-> MessagePanel
-ChatSidebar -[hidden]-> DashboardShared
-MessagePanel -[hidden]-> DashboardShared
-MessagePanel -[hidden]-> ReplyRoute
-MessagePanel -[hidden]-> AssignmentRoute
-MessagePanel -[hidden]-> ClientReadRoute
-MessagePanel -[hidden]-> TeamChatRoutes
-DashboardHero -[hidden]-> ManagerStatusRoute
-TelegramApi -[hidden]-> WebhookIndex
-WebhookIndex -[hidden]-> WebhookHandlers
-WebhookHandlers -[hidden]-> WebhookMessages
-WebhookMessages -[hidden]-> WebhookConfig
-WebhookConfig -[hidden]-> WebhookTelegram
 
 SupportManager --> Browser : uses
 Browser --> Page : requests /
 Page --> FrontSupabase : imports client
-Page --> MessagesDb : selects messages,\nteam messages, managers,\nmanager_statuses, assignments,\nread states
-Page --> AdminDashboard : passes initial data,\nmanager profile, statuses\nand access token
+Page --> SupportDb : selects chat data,\nworkflow status,\npriority_mode,\nmanual_priority_label,\npriority score and read states
+Page --> AdminDashboard : passes initial data\nand access token
 
-AdminDashboard --> DashboardHero : renders stats
+AdminDashboard --> DashboardHero : renders header
 AdminDashboard --> ChatSidebar : renders chat navigation
 AdminDashboard --> MessagePanel : renders selected chat
-AdminDashboard --> DashboardShared : preview and\nlabel helpers
-AdminDashboard --> FrontSupabase : opens realtime\nmessages, team messages,\nmanager_statuses and\npresence subscription
+AdminDashboard --> KnowledgeBaseUi : renders KB workspace
+AdminDashboard --> DashboardShared : preview and label helpers
+AdminDashboard --> FrontSupabase : opens realtime\nsubscriptions
 FrontSupabase --> Realtime : authenticated WebSocket
 Realtime --> AdminDashboard : postgres_changes and\npresence sync events
-ChatSidebar --> DashboardShared : formatTime and\nstatus metadata
-MessagePanel --> DashboardShared : format and\nlabel helpers
-MessagePanel --> ReplyRoute : POST reply text
-MessagePanel --> AssignmentRoute : POST assigned manager
-MessagePanel --> ClientReadRoute : POST last read client message
-MessagePanel --> TeamChatRoutes : POST team message\nand team read state
-DashboardHero --> ManagerStatusRoute : POST availability status
-ReplyRoute --> TelegramApi : POST /sendMessage
-ReplyRoute --> MessagesDb : insert manager message
-AssignmentRoute --> MessagesDb : upsert client_assignments
-ClientReadRoute --> MessagesDb : upsert client_read_states
-TeamChatRoutes --> MessagesDb : insert team_messages\nand upsert team_read_states
-ManagerStatusRoute --> MessagesDb : upsert manager_statuses
+
+MessagePanel --> DashboardShared : effective priority,\nlabels and timestamps
+MessagePanel --> ChatRoutes : sends chat actions
+DashboardHero --> ChatRoutes : sends manager status update
+ChatRoutes --> SupportDb : reads and writes\nchat-related tables,\nworkflow status,\nAI toggle and\nmanual priority override
+
+KnowledgeBaseUi --> KbRoutes : GET/POST/PATCH/DELETE\nKB data and reindex
+KbRoutes --> KbEmbeddings : reindex embeddings
+KbRoutes --> SupportDb : reads and writes\nkb_categories and kb_entries
+KbEmbeddings --> OpenAiApi : creates article embeddings
+KbEmbeddings --> SupportDb : writes kb_embeddings\nand KB status
 
 TelegramApi --> WebhookIndex : POST update
 WebhookIndex --> WebhookTelegram : extractTelegramMessage(update)
-WebhookIndex --> WebhookHandlers : dispatches /start\nor text flow
+WebhookIndex --> WebhookHandlers : dispatch inbound flow
 WebhookHandlers --> WebhookConfig : validates env presence
-WebhookHandlers --> WebhookMessages : saveIncomingMessage(...)
-WebhookHandlers --> WebhookTelegram : sendTelegramMessage(...)\nwhen auto-reply is needed
-WebhookMessages --> WebhookConfig : reads Supabase URL\nand service key
-WebhookMessages --> MessagesDb : upsert client and\ninsert inbound row
-WebhookTelegram --> WebhookConfig : reads bot token
+WebhookHandlers --> WebhookMessages : saveIncomingMessage,\ngetTodayAiReplyCount,\ngetLastAiReplyAt,\nsaveAiReplyEvent,\nsaveAiBotMessage
+WebhookHandlers --> WebhookAi : generateAutoReply(messageText)
+WebhookHandlers --> WebhookTelegram : sendTelegramMessage(...)
+WebhookMessages --> SupportDb : reads and writes\nclients, messages,\nclient_assignments,\nai_daily_usage,\nai_reply_events
+WebhookAi --> OpenAiApi : embeddings + responses
+WebhookAi --> SupportDb : rpc(match_kb_entries)\nand reads KB entries
 WebhookTelegram --> TelegramApi : POST /sendMessage
 
 @enduml

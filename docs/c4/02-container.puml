@@ -24,68 +24,52 @@ actor "Support Manager" as SupportManager
 rectangle "Telegram Bot API" as TelegramApi
 rectangle "Browser" as Browser
 rectangle "Supabase Realtime\nWebSocket transport" as Realtime
+rectangle "OpenAI API" as OpenAiApi
 
 package "SupportBot Containers" as SupportBot {
   package "support-admin" as SupportAdminBoundary {
     rectangle "Next.js page renderer\nsrc/app/page.tsx" as NextPage
-    rectangle "Admin dashboard UI\nAdminDashboard + child components" as DashboardUi
-    rectangle "Reply API route\n/api/clients/[clientId]/messages" as ReplyRoute
-    rectangle "Team message API routes\n/api/team-messages,\n/api/team-messages/read" as TeamChatRoutes
-    rectangle "Assignment + read API routes\n/api/clients/[clientId]/assignment,\n/api/clients/[clientId]/read" as DashboardStateRoutes
-    rectangle "Manager status API route\n/api/manager-status" as ManagerStatusRoute
+    rectangle "Admin dashboard UI\nchat workspace + KB workspace" as DashboardUi
+    rectangle "Chat API routes\nreply, assignment,\nworkflow status,\npriority, ai toggle,\nread, team chat,\nmanager status" as ChatRoutes
+    rectangle "Knowledge Base API routes\n/api/kb/categories,\n/api/kb/entries,\n/api/kb/reindex" as KbRoutes
     rectangle "Supabase JS clients\nSSR + browser realtime" as AdminSupabaseClient
   }
 
   package "Supabase Project" as SupabaseBoundary {
     rectangle "telegram-webhook\nDeno HTTP function" as Webhook
-    database "Postgres tables\nmessages, team_messages,\nmanager_statuses, read states,\nclients, managers, assignments" as MessagesDb
+    rectangle "Webhook AI layer\nhandlers.ts + ai.ts + messages.ts" as WebhookAi
+    database "Postgres tables\nmessages, clients,\nclient assignments,\nteam chat, statuses,\nread states, KB,\nai usage, ai events" as SupportDb
   }
 }
-
-SupportManager -[hidden]-> Browser
-Browser -[hidden]-> NextPage
-NextPage -[hidden]-> AdminSupabaseClient
-AdminSupabaseClient -[hidden]-> MessagesDb
-DashboardUi -[hidden]-> ReplyRoute
-DashboardUi -[hidden]-> TeamChatRoutes
-DashboardUi -[hidden]-> DashboardStateRoutes
-DashboardUi -[hidden]-> ManagerStatusRoute
-MessagesDb -[hidden]-> Realtime
-Realtime -[hidden]-> Browser
-TelegramUser -[hidden]-> TelegramApi
-TelegramApi -[hidden]-> Webhook
-Webhook -[hidden]-> MessagesDb
-NextPage -[hidden]-> DashboardUi
 
 SupportManager --> Browser : uses
 Browser --> NextPage : requests admin page
 NextPage --> AdminSupabaseClient : creates query client
-NextPage --> MessagesDb : selects messages,\nteam messages, managers,\nmanager statuses, assignments,\nread states
+NextPage --> SupportDb : selects messages,\nteam messages, managers,\nmanager statuses, assignments,\nworkflow status, effective priority\nand read states
 NextPage --> DashboardUi : passes initial data\nand auth token
+
 DashboardUi --> AdminSupabaseClient : subscribes to\nrealtime changes
 AdminSupabaseClient --> Realtime : opens authenticated\nWebSocket subscription
-Realtime --> DashboardUi : notifies about\nmessage, team chat,\nmanager status and presence changes
+Realtime --> DashboardUi : notifies about\nmessages, assignments,\nteam chat and manager status changes
+
+DashboardUi --> ChatRoutes : sends chat actions
+ChatRoutes --> SupportDb : inserts and updates\nchat-related data,\nworkflow status,\nAI toggle and\nmanual priority override
+
+DashboardUi --> KbRoutes : creates, edits,\nreads, reindexes and\ndeletes KB data
+KbRoutes --> SupportDb : reads and writes\nkb_categories, kb_entries\nand kb_embeddings
+KbRoutes --> OpenAiApi : creates KB embeddings
 
 TelegramUser --> TelegramApi : sends message
-TelegramApi --> Webhook : POST update\npayload
-Webhook --> MessagesDb : upserts client and\ninserts inbound message
-Webhook --> TelegramApi : POST sendMessage\nconditional auto-reply
+TelegramApi --> Webhook : POST update payload
+Webhook --> SupportDb : upserts client,\ninserts inbound message,\nupdates last_client_message_at,\nreads assignment state
+Webhook --> WebhookAi : handles canned replies\nor KB + RAG generation
+WebhookAi --> OpenAiApi : creates question embedding\nand formats answer
+WebhookAi --> SupportDb : rpc(match_kb_entries)\nand reads KB entries
+Webhook --> SupportDb : inserts ai_bot message,\nai_daily_usage,\nai_reply_events,\nupdates workflow status
+Webhook --> TelegramApi : POST sendMessage\nfor greeting, answer or fallback
 
-SupportManager --> DashboardUi : writes reply
-DashboardUi --> ReplyRoute : POST message text
-ReplyRoute --> TelegramApi : POST sendMessage
-ReplyRoute --> MessagesDb : inserts outgoing\nmanager message
-DashboardUi --> TeamChatRoutes : POST team message\nand team read state
-TeamChatRoutes --> MessagesDb : inserts team message\nor upserts team_read_states
-DashboardUi --> DashboardStateRoutes : POST assignment\nor client read state
-DashboardStateRoutes --> MessagesDb : upserts assignment\nor client_read_states
-DashboardUi --> ManagerStatusRoute : POST custom status
-ManagerStatusRoute --> MessagesDb : upserts manager_statuses
-
-AdminSupabaseClient --> MessagesDb : connects with\nmanager session / anon key
-ReplyRoute --> MessagesDb : connects with\nmanager session
-TeamChatRoutes --> MessagesDb : connects with\nmanager session
-DashboardStateRoutes --> MessagesDb : connects with\nmanager session
-ManagerStatusRoute --> MessagesDb : connects with\nmanager session
+AdminSupabaseClient --> SupportDb : connects with\nmanager session / anon key
+ChatRoutes --> SupportDb : connects with\nmanager session
+KbRoutes --> SupportDb : connects with\nmanager session
 
 @enduml
